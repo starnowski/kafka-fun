@@ -1,0 +1,22 @@
+source-processor:
+  questions:
+    - What is source processor ?
+  answers:  |
+    A source processor is a special type of stream processor that does not have any upstream processors.
+    It produces an input stream to its topology from one or multiple Kafka topics by consuming records from these topics and forwarding them to its down-stream processors.
+  links:
+    - https://kafka.apache.org/27/documentation/streams/core-concepts#streams_topology
+sink-processor:
+  questions:
+    - What is sink processor ?
+  answers:  |
+    A sink processor is a special type of stream processor that does not have down-stream processors.
+    It sends any received records from its up-stream processors to a specified Kafka topic.
+  links:
+    - https://kafka.apache.org/27/documentation/streams/core-concepts#streams_topology
+stream-processors-types:
+  questions:
+    - What are types of stream processors ?
+  answers:  "There are two special processors in the topology, source Processor and sink Processor"
+  links:
+    - https://kafka.apache.org/27/documentation/streams/core-concepts#streams_topology
