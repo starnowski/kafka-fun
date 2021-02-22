@@ -1,0 +1,23 @@
+name: Run tests for embedded-kafka
+
+on:
+  push:
+    paths:
+      - 'embedded-kafka/**'
+      - '.github/workflows/embedded-kafka.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v2
+
+      - name: Set up JDK 1.8
+        uses: actions/setup-java@v1
+        with:
+          java-version: 1.8
+
+      - name: Build with Maven
+        run: cd embedded-kafka && mvn clean install
