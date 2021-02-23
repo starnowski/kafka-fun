@@ -17,6 +17,7 @@ import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.kafka.test.utils.ContainerTestUtils;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
 import org.springframework.test.annotation.DirtiesContext;
+import reactor.core.publisher.Flux;
 import reactor.kafka.receiver.KafkaReceiver;
 import reactor.kafka.receiver.ReceiverOptions;
 import reactor.test.StepVerifier;
@@ -31,14 +32,20 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD;
 
 @SpringBootTest
 @DirtiesContext
 // https://blog.mimacom.com/testing-apache-kafka-with-spring-boot-junit5/
+//
+//@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+//@EmbeddedKafka(partitions = 1, topics = {KafkaReceiverTest.TOPIC}, brokerProperties = {"listeners=PLAINTEXT://localhost:9092", "port=9092"})
+@EmbeddedKafka(partitions = 1, topics = {KafkaReceiverTest.TOPIC})
+//@EmbeddedKafka(partitions = 2, topics = {KafkaReceiverTest.TOPIC})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@EmbeddedKafka(partitions = 1, topics = {KafkaReceiverTest.TOPIC}, brokerProperties = {"listeners=PLAINTEXT://localhost:9092", "port=9092"})
 public class KafkaReceiverTest {
 
     public static final String TOPIC = "embedded-test-topic";
@@ -55,8 +62,11 @@ public class KafkaReceiverTest {
 
     BlockingQueue<ConsumerRecord<String, String>> records;
 
+    KafkaReceiver receiver;
+
     @BeforeAll
     void setUp() {
+        receiver = prepareKafkaReceiver();
         Map<String, Object> configs = new HashMap<>(KafkaTestUtils.consumerProps("baeldung", "false", embeddedKafkaBroker));
         DefaultKafkaConsumerFactory<String, String> consumerFactory = new DefaultKafkaConsumerFactory<>(configs, new StringDeserializer(), new StringDeserializer());
         ContainerProperties containerProperties = new ContainerProperties(TOPIC);
@@ -67,32 +77,37 @@ public class KafkaReceiverTest {
         ContainerTestUtils.waitForAssignment(container, embeddedKafkaBroker.getPartitionsPerTopic());
     }
 
-    @Test
-    public void testReactiveConsumer() {
-        // GIVEN
+    private KafkaReceiver prepareKafkaReceiver()
+    {
         Map<String, Object> optionsMap = new HashMap<>();
         optionsMap.put("group.id", "baeldung");
         optionsMap.put("auto.offset.reset", "latest");
         optionsMap.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
         optionsMap.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-        optionsMap.put("bootstrap.servers", "localhost:9092");
-        optionsMap.put("enable.auto.commit", "true");
+        optionsMap.put("bootstrap.servers", embeddedKafkaBroker.getBrokersAsString());
+        optionsMap.put("enable.auto.commit", "false");
         optionsMap.put("auto.commit.interval.ms", "1000");
         ReceiverOptions<Object, Object> options = ReceiverOptions.create(optionsMap);
         options = options.assignment(Arrays.asList(new TopicPartition("embedded-test-topic", 0)));
-        KafkaReceiver receiver = KafkaReceiver.create(options);
+        return KafkaReceiver.create(options);
+    }
+
+    @Test
+    public void testReactiveConsumer() {
+        // GIVEN
+//        KafkaReceiver receiver = prepareKafkaReceiver();
         Random random = new Random();
         String expectedValue = "SSS" + random.nextInt();
-
+        Flux stream = receiver.receive();
 
         //WHEN
-        StepVerifier.FirstStep steps = StepVerifier.create(receiver.receive());
+        StepVerifier.FirstStep steps = StepVerifier.create(stream);
 
         //THEN
         steps.then(() -> {
             try {
-                SendResult<String, String> result = kafkaTemplate.send("embedded-test-topic", "KEY", expectedValue).get();
-                kafkaTemplate.flush();
+                logger.log(Level.INFO, "testReactiveConsumer#kafkaTemplate.send : ");
+                kafkaTemplate.send("embedded-test-topic", "KEY", expectedValue).get();
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } catch (ExecutionException e) {
@@ -115,25 +130,15 @@ public class KafkaReceiverTest {
     @Test
     public void testReactiveConsumer1() {
         // GIVEN
-        Map<String, Object> optionsMap = KafkaTestUtils.producerProps(embeddedKafkaBroker);
-        optionsMap.put("group.id", "baeldung");
-        optionsMap.put("auto.offset.reset", "latest");
-        optionsMap.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-        optionsMap.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-        optionsMap.put("bootstrap.servers", "localhost:9092");
-        optionsMap.put("enable.auto.commit", "true");
-        optionsMap.put("auto.commit.interval.ms", "1000");
-        ReceiverOptions<Object, Object> options = ReceiverOptions.create(optionsMap);
-        options = options.assignment(Arrays.asList(new TopicPartition("embedded-test-topic", 0)));
-        KafkaReceiver receiver = KafkaReceiver.create(options);
+//        KafkaReceiver receiver = prepareKafkaReceiver();
         Random random = new Random();
         String expectedValue = "YYY" + random.nextInt();
 
         StepVerifier.create(receiver.receive())
                 .then(() -> {
                     try {
+                        logger.log(Level.INFO, "testReactiveConsumer1#kafkaTemplate.send : ");
                         kafkaTemplate.send("embedded-test-topic", "KEY", expectedValue).get();
-                        kafkaTemplate.flush();
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     } catch (ExecutionException e) {
