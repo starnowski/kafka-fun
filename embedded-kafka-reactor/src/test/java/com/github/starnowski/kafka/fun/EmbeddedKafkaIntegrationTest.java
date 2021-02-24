@@ -1,5 +1,6 @@
 package com.github.starnowski.kafka.fun;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,6 +27,7 @@ class EmbeddedKafkaIntegrationTest {
     @Value("${test.topic}")
     private String topic;
 
+    @Disabled
     @Test
     public void givenEmbeddedKafkaBroker_whenSendingtoSimpleProducer_thenMessageReceived()
             throws Exception {

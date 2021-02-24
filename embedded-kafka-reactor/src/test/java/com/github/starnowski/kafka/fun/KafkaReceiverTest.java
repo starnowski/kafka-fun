@@ -38,14 +38,14 @@ import java.util.stream.Stream;
 import static org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD;
 
 @SpringBootTest
-@DirtiesContext
+//@DirtiesContext
 // https://blog.mimacom.com/testing-apache-kafka-with-spring-boot-junit5/
 //
 //@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 //@EmbeddedKafka(partitions = 1, topics = {KafkaReceiverTest.TOPIC}, brokerProperties = {"listeners=PLAINTEXT://localhost:9092", "port=9092"})
 @EmbeddedKafka(partitions = 1, topics = {KafkaReceiverTest.TOPIC})
 //@EmbeddedKafka(partitions = 2, topics = {KafkaReceiverTest.TOPIC})
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+//@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class KafkaReceiverTest {
 
     public static final String TOPIC = "embedded-test-topic";
@@ -64,24 +64,26 @@ public class KafkaReceiverTest {
 
     KafkaReceiver receiver;
 
-    @BeforeAll
+    @BeforeEach
     void setUp() {
-        receiver = prepareKafkaReceiver();
-        Map<String, Object> configs = new HashMap<>(KafkaTestUtils.consumerProps("baeldung", "false", embeddedKafkaBroker));
-        DefaultKafkaConsumerFactory<String, String> consumerFactory = new DefaultKafkaConsumerFactory<>(configs, new StringDeserializer(), new StringDeserializer());
-        ContainerProperties containerProperties = new ContainerProperties(TOPIC);
-        container = new KafkaMessageListenerContainer<>(consumerFactory, containerProperties);
-        records = new LinkedBlockingQueue<>();
-        container.setupMessageListener((MessageListener<String, String>) records::add);
-        container.start();
-        ContainerTestUtils.waitForAssignment(container, embeddedKafkaBroker.getPartitionsPerTopic());
+//        receiver = prepareKafkaReceiver("Test0");
+//        Map<String, Object> configs = new HashMap<>(KafkaTestUtils.consumerProps("baeldung", "false", embeddedKafkaBroker));
+//        DefaultKafkaConsumerFactory<String, String> consumerFactory = new DefaultKafkaConsumerFactory<>(configs, new StringDeserializer(), new StringDeserializer());
+//        ContainerProperties containerProperties = new ContainerProperties(TOPIC);
+//        container = new KafkaMessageListenerContainer<>(consumerFactory, containerProperties);
+//        records = new LinkedBlockingQueue<>();
+//        container.setupMessageListener((MessageListener<String, String>) records::add);
+//        container.start();
+//        ContainerTestUtils.waitForAssignment(container, embeddedKafkaBroker.getPartitionsPerTopic());
     }
 
-    private KafkaReceiver prepareKafkaReceiver()
+    private KafkaReceiver prepareKafkaReceiver(String clientId)
     {
         Map<String, Object> optionsMap = new HashMap<>();
         optionsMap.put("group.id", "baeldung");
-        optionsMap.put("auto.offset.reset", "latest");
+//        optionsMap.put("auto.offset.reset", "latest");
+        optionsMap.put("client.id", clientId);
+        optionsMap.put("auto.offset.reset", "earliest");
         optionsMap.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
         optionsMap.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
         optionsMap.put("bootstrap.servers", embeddedKafkaBroker.getBrokersAsString());
@@ -93,9 +95,10 @@ public class KafkaReceiverTest {
     }
 
     @Test
+    @DirtiesContext
     public void testReactiveConsumer() {
         // GIVEN
-//        KafkaReceiver receiver = prepareKafkaReceiver();
+        KafkaReceiver receiver = prepareKafkaReceiver("Test1");
         Random random = new Random();
         String expectedValue = "SSS" + random.nextInt();
         Flux stream = receiver.receive();
@@ -123,14 +126,16 @@ public class KafkaReceiverTest {
                 })
                 // the KafkaReceiver will never complete, we need to cancel explicitly
                 .thenCancel()
+//                .expectComplete()
                 // always use a timeout, in case we don't receive anything
                 .verify(Duration.ofSeconds(15));
     }
 
     @Test
+    @DirtiesContext
     public void testReactiveConsumer1() {
         // GIVEN
-//        KafkaReceiver receiver = prepareKafkaReceiver();
+        KafkaReceiver receiver = prepareKafkaReceiver("Test2");
         Random random = new Random();
         String expectedValue = "YYY" + random.nextInt();
 
@@ -155,12 +160,13 @@ public class KafkaReceiverTest {
                 })
                 // the KafkaReceiver will never complete, we need to cancel explicitly
                 .thenCancel()
+//                .expectComplete()
                 // always use a timeout, in case we don't receive anything
                 .verify(Duration.ofSeconds(15));
     }
 
-    @AfterAll
+    @AfterEach
     void tearDown() {
-        container.stop();
+//        container.stop();
     }
 }
