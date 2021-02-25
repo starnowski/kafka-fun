@@ -2,20 +2,13 @@ package com.github.starnowski.kafka.fun;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.common.serialization.StringDeserializer;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.listener.ContainerProperties;
-import org.springframework.kafka.listener.KafkaMessageListenerContainer;
-import org.springframework.kafka.listener.MessageListener;
-import org.springframework.kafka.support.SendResult;
 import org.springframework.kafka.test.EmbeddedKafkaBroker;
 import org.springframework.kafka.test.context.EmbeddedKafka;
-import org.springframework.kafka.test.utils.ContainerTestUtils;
-import org.springframework.kafka.test.utils.KafkaTestUtils;
 import org.springframework.test.annotation.DirtiesContext;
 import reactor.core.publisher.Flux;
 import reactor.kafka.receiver.KafkaReceiver;
@@ -27,25 +20,12 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import static org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD;
 
 @SpringBootTest
-//@DirtiesContext
-// https://blog.mimacom.com/testing-apache-kafka-with-spring-boot-junit5/
-//
-//@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-//@EmbeddedKafka(partitions = 1, topics = {KafkaReceiverTest.TOPIC}, brokerProperties = {"listeners=PLAINTEXT://localhost:9092", "port=9092"})
 @EmbeddedKafka(partitions = 1, topics = {KafkaReceiverTest.TOPIC})
-//@EmbeddedKafka(partitions = 2, topics = {KafkaReceiverTest.TOPIC})
-//@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class KafkaReceiverTest {
 
     public static final String TOPIC = "embedded-test-topic";
@@ -54,34 +34,13 @@ public class KafkaReceiverTest {
 
     @Autowired
     private KafkaTemplate<String, String> kafkaTemplate;
-
     @Autowired
     private EmbeddedKafkaBroker embeddedKafkaBroker;
 
-    KafkaMessageListenerContainer<String, String> container;
 
-    BlockingQueue<ConsumerRecord<String, String>> records;
-
-    KafkaReceiver receiver;
-
-    @BeforeEach
-    void setUp() {
-//        receiver = prepareKafkaReceiver("Test0");
-//        Map<String, Object> configs = new HashMap<>(KafkaTestUtils.consumerProps("baeldung", "false", embeddedKafkaBroker));
-//        DefaultKafkaConsumerFactory<String, String> consumerFactory = new DefaultKafkaConsumerFactory<>(configs, new StringDeserializer(), new StringDeserializer());
-//        ContainerProperties containerProperties = new ContainerProperties(TOPIC);
-//        container = new KafkaMessageListenerContainer<>(consumerFactory, containerProperties);
-//        records = new LinkedBlockingQueue<>();
-//        container.setupMessageListener((MessageListener<String, String>) records::add);
-//        container.start();
-//        ContainerTestUtils.waitForAssignment(container, embeddedKafkaBroker.getPartitionsPerTopic());
-    }
-
-    private KafkaReceiver prepareKafkaReceiver(String clientId)
-    {
+    private KafkaReceiver prepareKafkaReceiver(String clientId) {
         Map<String, Object> optionsMap = new HashMap<>();
         optionsMap.put("group.id", "baeldung");
-//        optionsMap.put("auto.offset.reset", "latest");
         optionsMap.put("client.id", clientId);
         optionsMap.put("auto.offset.reset", "earliest");
         optionsMap.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
@@ -126,7 +85,6 @@ public class KafkaReceiverTest {
                 })
                 // the KafkaReceiver will never complete, we need to cancel explicitly
                 .thenCancel()
-//                .expectComplete()
                 // always use a timeout, in case we don't receive anything
                 .verify(Duration.ofSeconds(15));
     }
@@ -160,13 +118,7 @@ public class KafkaReceiverTest {
                 })
                 // the KafkaReceiver will never complete, we need to cancel explicitly
                 .thenCancel()
-//                .expectComplete()
                 // always use a timeout, in case we don't receive anything
                 .verify(Duration.ofSeconds(15));
-    }
-
-    @AfterEach
-    void tearDown() {
-//        container.stop();
     }
 }
