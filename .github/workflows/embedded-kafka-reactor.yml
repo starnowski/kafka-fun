@@ -1,4 +1,4 @@
-name: Run tests for embedded-kafka
+name: Run tests for embedded-kafka-reactor
 
 on:
   push:
