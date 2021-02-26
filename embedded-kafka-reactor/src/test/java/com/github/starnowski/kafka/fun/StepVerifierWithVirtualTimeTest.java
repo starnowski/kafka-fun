@@ -58,6 +58,38 @@ public class StepVerifierWithVirtualTimeTest {
     }
 
     @Test
+    public void shouldProcessAllEventsWhenReturnCorrectValues() {
+        // GIVEN
+        ConstantNumberSupplierWithFailerHandler supplierWithFailerHandler = mock(ConstantNumberSupplierWithFailerHandler.class);
+        ReceiverRecord<String, String> receiverRecord1 = mock(ReceiverRecord.class);
+        ReceiverRecord<String, String> receiverRecord2 = mock(ReceiverRecord.class);
+        when(supplierWithFailerHandler.get(receiverRecord1)).thenReturn(Flux.just(13));
+        when(supplierWithFailerHandler.get(receiverRecord2)).thenReturn(Flux.just(45));
+
+
+        // THEN
+        StepVerifier
+                .withVirtualTime(() -> Flux.just(receiverRecord1, receiverRecord2).flatMap(rr -> supplierWithFailerHandler.get(rr)
+                        )
+                                .retryWhen(
+                                        Retry
+                                                .backoff(1, Duration.ofSeconds(2))
+                                                .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> {
+
+                                                    return new RuntimeException("AAA");
+                                                })
+                                                .transientErrors(true)
+                                )
+                )
+                .expectSubscription()
+                .expectNext(13)
+                .expectNext(45)
+                .verifyComplete();
+        verify(supplierWithFailerHandler, atMostOnce()).get(receiverRecord1);
+        verify(supplierWithFailerHandler, atMostOnce()).get(receiverRecord2);
+    }
+
+    @Test
     @Disabled("Not yet finished")
     public void xxx() {
         // GIVEN
@@ -70,14 +102,35 @@ public class StepVerifierWithVirtualTimeTest {
 
         // THEN
         StepVerifier
-                .withVirtualTime(() -> Flux.just(receiverRecord1, receiverRecord2).flatMap(rr -> supplierWithFailerHandler.get(rr).retryWhen(Retry.backoff(5, Duration.ofSeconds(8)))
+                .withVirtualTime(() -> Flux.just(receiverRecord1, receiverRecord2).flatMap(rr -> supplierWithFailerHandler.get(rr)
+//                                .retryWhen(Retry.backoff(1, Duration.ofSeconds(8)))
                         )
-                                .onErrorContinue((throwable, o) -> {
-                                    System.out.println("Exception is : " + throwable + " for object : " + o);
-                                })
+                        .retryWhen(
+                                Retry
+                                        .backoff(1, Duration.ofSeconds(2))
+                                        .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> {
+
+                                            return new RuntimeException("AAA");
+                                        })
+                                        .transientErrors(true)
+                        )
+//                                .onErrorContinue(throwable -> {
+//                                    System.out.println(throwable);
+//                                    return RuntimeException.class.equals(throwable.getClass()) && "AAA".equals(throwable.getMessage());
+//                                }, (throwable, o) -> {
+//
+//                                })
+                                .onErrorReturn(throwable -> {
+                                            System.out.println(throwable);
+                                            return RuntimeException.class.equals(throwable.getClass()) && "AAA".equals(throwable.getMessage());
+                                        },
+                                        -1
+                                        )
                 )
                 .expectSubscription()
+                .expectNoEvent(Duration.ofSeconds(2))
                 .thenAwait(Duration.ofSeconds(2))
+                .expectNext(-1)
                 .expectNext(45)
                 .verifyComplete();
         verify(supplierWithFailerHandler, times(2)).get(receiverRecord1);
