@@ -20,9 +20,9 @@ public class StepVerifierWithVirtualTimeTest {
         ReceiverRecord<String, String> receiverRecord = Mockito.mock(ReceiverRecord.class);
 
         StepVerifier
-                .withVirtualTime(() -> Flux.just(receiverRecord).flatMap(rr -> supplierWithFailerHandler.get(rr)
-                        )
-                                .retryWhen(Retry.backoff(1, Duration.ofSeconds(2)))
+                .withVirtualTime(() -> Flux.just(receiverRecord)
+                        .flatMap(rr -> supplierWithFailerHandler.get(rr))
+                        .retryWhen(Retry.backoff(1, Duration.ofSeconds(2)))
                 )
                 .expectSubscription()
                 .expectNoEvent(Duration.ofSeconds(2))
