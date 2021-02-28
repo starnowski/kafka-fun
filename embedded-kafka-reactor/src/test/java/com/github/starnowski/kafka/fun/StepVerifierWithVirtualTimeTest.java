@@ -187,6 +187,49 @@ public class StepVerifierWithVirtualTimeTest {
         // WHEN
         Flux<Integer> stream = Flux.just(receiverRecord1, receiverRecord2).flatMap(rr -> supplierWithFailerHandler.get(rr).retryWhen(retry)
                 .log()
+                .onErrorReturn(throwable ->
+                {
+                    System.out.println("Error in stream: " + throwable);
+                    return true;
+                },-1)
+                .log()
+        )
+                .log();
+
+
+        // THEN
+        StepVerifier
+                .withVirtualTime(() -> stream)
+                .expectSubscription()
+                .expectNoEvent(Duration.ofSeconds(2))
+                .thenAwait(ofSeconds(2))
+                .thenAwait(ofSeconds(2))
+                .expectNext(45)
+                .expectNext(-1)
+                .verifyComplete()
+        ;
+        verify(randomFacade, times(2)).returnNextIntForRecord(receiverRecord1);
+        verify(randomFacade, atMostOnce()).returnNextIntForRecord(receiverRecord2);
+    }
+
+    @Test
+    public void shouldProcessStreamWhenFirstFirstEventFailsForAllAttempts() {
+        // GIVEN
+        RandomFacade randomFacade = mock(RandomFacade.class);
+        RandomNumberSupplierWithFailerHandler supplierWithFailerHandler = new RandomNumberSupplierWithFailerHandler(randomFacade);
+        ReceiverRecord<String, String> receiverRecord1 = mockWithMockedToString(ReceiverRecord.class, "record1");
+        ReceiverRecord<String, String> receiverRecord2 = mockWithMockedToString(ReceiverRecord.class, "record2");
+        when(randomFacade.returnNextIntForRecord(receiverRecord1)).thenThrow(new RuntimeException("1234"));
+        when(randomFacade.returnNextIntForRecord(receiverRecord2)).thenReturn(45);
+        Retry retry = Retry
+                .backoff(1, ofSeconds(2))
+                .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> new RuntimeException("AAA"))
+                .transientErrors(true);
+
+
+        // WHEN
+        Flux<Integer> stream = Flux.just(receiverRecord1, receiverRecord2).flatMap(rr -> supplierWithFailerHandler.get(rr).retryWhen(retry)
+                .log()
                 .onErrorContinue(throwable ->
                 {
                     System.out.println("Error in stream: " + throwable);
