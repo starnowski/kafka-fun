@@ -2,6 +2,7 @@ package com.github.starnowski.kafka.fun;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import reactor.core.publisher.Flux;
 import reactor.kafka.receiver.ReceiverRecord;
 import reactor.test.StepVerifier;
@@ -221,6 +222,7 @@ public class StepVerifierWithVirtualTimeTest {
         ReceiverRecord<String, String> receiverRecord2 = mockWithMockedToString(ReceiverRecord.class, "record2");
         when(randomFacade.returnNextIntForRecord(receiverRecord1)).thenThrow(new RuntimeException("1234"));
         when(randomFacade.returnNextIntForRecord(receiverRecord2)).thenReturn(45);
+        InOrder inOrder = inOrder(randomFacade);
         Retry retry = Retry
                 .backoff(1, ofSeconds(2))
                 .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> new RuntimeException("AAA"))
@@ -254,6 +256,10 @@ public class StepVerifierWithVirtualTimeTest {
         ;
         verify(randomFacade, times(2)).returnNextIntForRecord(receiverRecord1);
         verify(randomFacade, atMostOnce()).returnNextIntForRecord(receiverRecord2);
+        // Verify order
+        inOrder.verify(randomFacade).returnNextIntForRecord(receiverRecord1);
+        inOrder.verify(randomFacade).returnNextIntForRecord(receiverRecord2);
+        inOrder.verify(randomFacade).returnNextIntForRecord(receiverRecord1);
     }
 
     private static <T> T mockWithMockedToString(Class<T> classToMock, String message) {
