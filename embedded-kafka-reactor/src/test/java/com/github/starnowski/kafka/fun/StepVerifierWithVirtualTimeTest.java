@@ -170,33 +170,23 @@ public class StepVerifierWithVirtualTimeTest {
     }
 
     @Test
-    @Disabled("not yet finished")
     public void shouldProcessStreamWhenFirstFirstEventFailsForAllAttempts() {
         // GIVEN
         RandomFacade randomFacade = mock(RandomFacade.class);
         RandomNumberSupplierWithFailerHandler supplierWithFailerHandler = new RandomNumberSupplierWithFailerHandler(randomFacade);
-//        ReceiverRecord<String, String> receiverRecord1 = mock(ReceiverRecord.class);
         ReceiverRecord<String, String> receiverRecord1 = mockWithMockedToString(ReceiverRecord.class, "record1");
-//        ReceiverRecord<String, String> receiverRecord2 = mock(ReceiverRecord.class);
         ReceiverRecord<String, String> receiverRecord2 = mockWithMockedToString(ReceiverRecord.class, "record2");
         when(randomFacade.returnNextIntForRecord(receiverRecord1)).thenThrow(new RuntimeException("1234"));
         when(randomFacade.returnNextIntForRecord(receiverRecord2)).thenReturn(45);
         Retry retry = Retry
                 .backoff(1, ofSeconds(2))
-                .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> {
-
-                    return new RuntimeException("AAA");
-                })
+                .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> new RuntimeException("AAA"))
                 .transientErrors(true);
 
 
         // WHEN
         Flux<Integer> stream = Flux.just(receiverRecord1, receiverRecord2).flatMap(rr -> supplierWithFailerHandler.get(rr).retryWhen(retry)
                 .log()
-//                .onErrorContinue((throwable, o) ->
-//                {
-//                    System.out.println("Error in stream: " + throwable);
-//                })
                 .onErrorReturn(throwable ->
                 {
                     System.out.println("Error in stream: " + throwable);
@@ -204,12 +194,6 @@ public class StepVerifierWithVirtualTimeTest {
                 },-1)
                 .log()
         )
-                .log()
-//                .onErrorContinue((throwable, o) ->
-//                {
-//                    System.out.println("Error in stream: " + throwable);
-//                })
-//                .onErrorReturn(-1)
                 .log();
 
 
