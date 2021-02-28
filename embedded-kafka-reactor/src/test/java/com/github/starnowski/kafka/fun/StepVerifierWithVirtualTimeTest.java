@@ -204,7 +204,6 @@ public class StepVerifierWithVirtualTimeTest {
                 .expectSubscription()
                 .expectNoEvent(Duration.ofSeconds(2))
                 .thenAwait(ofSeconds(2))
-                .thenAwait(ofSeconds(2))
                 .expectNext(45)
                 .thenAwait(ofSeconds(2))
                 .thenCancel()
