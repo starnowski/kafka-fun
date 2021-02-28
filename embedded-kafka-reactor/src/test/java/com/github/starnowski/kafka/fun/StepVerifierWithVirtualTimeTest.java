@@ -318,13 +318,13 @@ public class StepVerifierWithVirtualTimeTest {
         RandomNumberSupplierWithFailerHandler supplierWithFailerHandler = new RandomNumberSupplierWithFailerHandler(randomFacade);
         ReceiverRecord<String, String> receiverRecord1 = mockWithMockedToString(ReceiverRecord.class, "record1");
         ReceiverRecord<String, String> receiverRecord2 = mockWithMockedToString(ReceiverRecord.class, "record2");
-        when(randomFacade.returnNextIntForRecord(receiverRecord1)).thenThrow(new RuntimeException("1234"));
+        when(randomFacade.returnNextIntForRecord(receiverRecord1)).thenThrow(new SomeNonRecoverableException());
         when(randomFacade.returnNextIntForRecord(receiverRecord2)).thenReturn(73);
         InOrder inOrder = inOrder(randomFacade);
         Retry retry = Retry
                 .backoff(7, ofSeconds(2))
                 .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> new RuntimeException("AAA"))
-                .filter(throwable -> !RetryFailedException.class.equals(throwable.getClass()))
+                .filter(throwable -> !SomeNonRecoverableException.class.equals(throwable.getClass()))
                 .transientErrors(true);
 
 
@@ -361,6 +361,54 @@ public class StepVerifierWithVirtualTimeTest {
         inOrder.verify(randomFacade, times(7)).returnNextIntForRecord(receiverRecord1);
     }
 
+    @Test
+    public void shouldProcessStreamWhenFirstFirstEventFailsAndNotRetryWhenSpecifiedErrorFilterIgnoreThrownException() {
+        // GIVEN
+        RandomFacade randomFacade = mock(RandomFacade.class);
+        RandomNumberSupplierWithFailerHandler supplierWithFailerHandler = new RandomNumberSupplierWithFailerHandler(randomFacade);
+        ReceiverRecord<String, String> receiverRecord1 = mockWithMockedToString(ReceiverRecord.class, "record1");
+        ReceiverRecord<String, String> receiverRecord2 = mockWithMockedToString(ReceiverRecord.class, "record2");
+        when(randomFacade.returnNextIntForRecord(receiverRecord1)).thenThrow(new SomeNonRecoverableException());
+        when(randomFacade.returnNextIntForRecord(receiverRecord2)).thenReturn(89);
+        InOrder inOrder = inOrder(randomFacade);
+        Retry retry = Retry
+                .backoff(7, ofSeconds(2))
+                .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> new RuntimeException("AAA"))
+                .filter(throwable -> !SomeNonRecoverableException.class.equals(throwable.getClass()))
+                .transientErrors(true);
+
+
+        // WHEN
+        Flux<Integer> stream = Flux.just(receiverRecord1, receiverRecord2).flatMap(rr -> supplierWithFailerHandler.get(rr).retryWhen(retry)
+                .log()
+                .onErrorContinue(throwable ->
+                        {
+                            System.out.println("Error in stream: " + throwable);
+                            return true;
+                        },
+                        (throwable, o) -> {})
+                .log()
+        )
+                .log();
+
+
+        // THEN
+        StepVerifier
+                .withVirtualTime(() -> stream)
+                .expectSubscription()
+                .expectNoEvent(Duration.ofSeconds(2))
+                .expectNext(89)
+                .thenCancel()
+                .verify(Duration.ofSeconds(1));
+        ;
+        verify(randomFacade, atMostOnce()).returnNextIntForRecord(receiverRecord1);
+        verify(randomFacade, atMostOnce()).returnNextIntForRecord(receiverRecord2);
+        // Verify order
+        inOrder.verify(randomFacade).returnNextIntForRecord(receiverRecord1);
+        inOrder.verify(randomFacade).returnNextIntForRecord(receiverRecord2);
+    }
+
+
     private static <T> T mockWithMockedToString(Class<T> classToMock, String message) {
         T mock = mock(classToMock);
         when(mock.toString()).thenReturn(message);
@@ -368,5 +416,8 @@ public class StepVerifierWithVirtualTimeTest {
     }
 
     private static final class RetryFailedException extends RuntimeException
+    {}
+
+    private static final class SomeNonRecoverableException extends RuntimeException
     {}
 }
