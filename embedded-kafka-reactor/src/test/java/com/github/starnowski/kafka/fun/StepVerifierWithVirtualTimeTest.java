@@ -170,7 +170,7 @@ public class StepVerifierWithVirtualTimeTest {
     }
 
     @Test
-    public void shouldProcessStreamWhenFirstFirstEventFailsForAllAttempts() {
+    public void shouldProcessStreamAndReturnFakeValueForFirstEventWhenFirstFirstEventFailsForAllAttempts() {
         // GIVEN
         RandomFacade randomFacade = mock(RandomFacade.class);
         RandomNumberSupplierWithFailerHandler supplierWithFailerHandler = new RandomNumberSupplierWithFailerHandler(randomFacade);
