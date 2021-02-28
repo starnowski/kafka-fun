@@ -262,6 +262,55 @@ public class StepVerifierWithVirtualTimeTest {
         inOrder.verify(randomFacade).returnNextIntForRecord(receiverRecord1);
     }
 
+    @Test
+    public void shouldProcessStreamWhenFirstFirstEventFailsForAllMultipleAttempts() {
+        // GIVEN
+        RandomFacade randomFacade = mock(RandomFacade.class);
+        RandomNumberSupplierWithFailerHandler supplierWithFailerHandler = new RandomNumberSupplierWithFailerHandler(randomFacade);
+        ReceiverRecord<String, String> receiverRecord1 = mockWithMockedToString(ReceiverRecord.class, "record1");
+        ReceiverRecord<String, String> receiverRecord2 = mockWithMockedToString(ReceiverRecord.class, "record2");
+        when(randomFacade.returnNextIntForRecord(receiverRecord1)).thenThrow(new RuntimeException("1234"));
+        when(randomFacade.returnNextIntForRecord(receiverRecord2)).thenReturn(73);
+        InOrder inOrder = inOrder(randomFacade);
+        Retry retry = Retry
+                .backoff(7, ofSeconds(2))
+                .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> new RuntimeException("AAA"))
+                .transientErrors(true);
+
+
+        // WHEN
+        Flux<Integer> stream = Flux.just(receiverRecord1, receiverRecord2).flatMap(rr -> supplierWithFailerHandler.get(rr).retryWhen(retry)
+                .log()
+                .onErrorContinue(throwable ->
+                        {
+                            System.out.println("Error in stream: " + throwable);
+                            return true;
+                        },
+                        (throwable, o) -> {})
+                .log()
+        )
+                .log();
+
+
+        // THEN
+        StepVerifier
+                .withVirtualTime(() -> stream)
+                .expectSubscription()
+                .expectNoEvent(Duration.ofSeconds(2))
+                .thenAwait(ofSeconds(2))
+                .expectNext(73)
+                .thenAwait(ofSeconds(360))//TODO check how min and max backoff is calculated
+                .thenCancel()
+                .verify(Duration.ofSeconds(1));
+        ;
+        verify(randomFacade, times(8)).returnNextIntForRecord(receiverRecord1);
+        verify(randomFacade, atMostOnce()).returnNextIntForRecord(receiverRecord2);
+        // Verify order
+        inOrder.verify(randomFacade).returnNextIntForRecord(receiverRecord1);
+        inOrder.verify(randomFacade).returnNextIntForRecord(receiverRecord2);
+        inOrder.verify(randomFacade, times(7)).returnNextIntForRecord(receiverRecord1);
+    }
+
     private static <T> T mockWithMockedToString(Class<T> classToMock, String message) {
         T mock = mock(classToMock);
         when(mock.toString()).thenReturn(message);
