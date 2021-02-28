@@ -172,52 +172,48 @@ public class StepVerifierWithVirtualTimeTest {
         verify(supplierWithFailerHandler, atMostOnce()).get(receiverRecord2);
     }
 
-
     @Test
-    @Disabled("Not yet finished")
-    public void xxx() {
+    @Disabled("not yet finished")
+    public void shouldProcessStreamWhenFirstFirstEventFailsForAllAttempts() {
         // GIVEN
-        // https://www.vinsguru.com/reactor-repeat-vs-reactor-retry/
-        // https://blog.trifork.com/2019/03/13/retry-functionality-in-a-reactive-programming-context/
         ConstantNumberSupplierWithFailerHandler supplierWithFailerHandler = mock(ConstantNumberSupplierWithFailerHandler.class);
         ReceiverRecord<String, String> receiverRecord1 = mock(ReceiverRecord.class);
         ReceiverRecord<String, String> receiverRecord2 = mock(ReceiverRecord.class);
         when(supplierWithFailerHandler.get(receiverRecord1)).thenThrow(new RuntimeException("1234"));
         when(supplierWithFailerHandler.get(receiverRecord2)).thenReturn(Flux.just(45));
 
+        // WHEN
+        Flux<Integer> stream = Flux.just(receiverRecord1, receiverRecord2).flatMap(rr -> supplierWithFailerHandler.get(rr)
+        )
+                .log()
+                .retryWhen(
+                        Retry
+                                .backoff(1, ofSeconds(2))
+                                .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> {
+
+                                    return new RuntimeException("AAA");
+                                })
+                                .transientErrors(true)
+                )
+                // Redundant declaration
+                .onErrorContinue(throwable -> false, (throwable, o) -> {
+                })
+                .log();
+
 
         // THEN
         StepVerifier
-                .withVirtualTime(() -> Flux.just(receiverRecord1, receiverRecord2).flatMap(
-                        rr ->
-//                                supplierWithFailerHandler.get(rr)
-//                                .retryWhen(Retry
-//                                        .backoff(1, Duration.ofSeconds(2))
-//                                        .transientErrors(true)
-//                                )
-//                                .log()
-//                                .onErrorReturn(-1)
-                        Mono.just(supplierWithFailerHandler.get(rr))
-                                                        .retryWhen(Retry
-                                        .backoff(1, ofSeconds(2))
-                                        .transientErrors(true)
-                                )
-                                .log().block()
-
-                        )
-                        .onErrorContinue(throwable -> true, (throwable, o) -> {})
-                        .log()
-
-                )
+                .withVirtualTime(() -> stream)
                 .expectSubscription()
-//                .expectNoEvent(Duration.ofSeconds(2))
+                .expectNoEvent(Duration.ofSeconds(2))
                 .thenAwait(ofSeconds(2))
-//                .thenAwait(Duration.ofSeconds(2))
-//                .expectNext(-1)
-//                .thenAwait(Duration.ofSeconds(2))
+                .thenAwait(ofSeconds(2))
                 .expectNext(45)
                 .verifyComplete();
         verify(supplierWithFailerHandler, times(2)).get(receiverRecord1);
         verify(supplierWithFailerHandler, atMostOnce()).get(receiverRecord2);
     }
+
+    private static final class RetryFailedException extends RuntimeException
+    {}
 }
