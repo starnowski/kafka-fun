@@ -181,23 +181,21 @@ public class StepVerifierWithVirtualTimeTest {
         ReceiverRecord<String, String> receiverRecord2 = mock(ReceiverRecord.class);
         when(supplierWithFailerHandler.get(receiverRecord1)).thenThrow(new RuntimeException("1234"));
         when(supplierWithFailerHandler.get(receiverRecord2)).thenReturn(Flux.just(45));
+        Retry retry = Retry
+                .backoff(1, ofSeconds(2))
+                .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> {
+
+                    return new RuntimeException("AAA");
+                })
+                .transientErrors(true);
+
 
         // WHEN
         Flux<Integer> stream = Flux.just(receiverRecord1, receiverRecord2).flatMap(rr -> supplierWithFailerHandler.get(rr)
         )
                 .log()
-                .retryWhen(
-                        Retry
-                                .backoff(1, ofSeconds(2))
-                                .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> {
-
-                                    return new RuntimeException("AAA");
-                                })
-                                .transientErrors(true)
+                .retryWhen(retry
                 )
-                // Redundant declaration
-                .onErrorContinue(throwable -> false, (throwable, o) -> {
-                })
                 .log();
 
 
