@@ -187,11 +187,12 @@ public class StepVerifierWithVirtualTimeTest {
         // WHEN
         Flux<Integer> stream = Flux.just(receiverRecord1, receiverRecord2).flatMap(rr -> supplierWithFailerHandler.get(rr).retryWhen(retry)
                 .log()
-                .onErrorReturn(throwable ->
+                .onErrorContinue(throwable ->
                 {
                     System.out.println("Error in stream: " + throwable);
                     return true;
-                },-1)
+                },
+                        (throwable, o) -> {})
                 .log()
         )
                 .log();
@@ -205,8 +206,9 @@ public class StepVerifierWithVirtualTimeTest {
                 .thenAwait(ofSeconds(2))
                 .thenAwait(ofSeconds(2))
                 .expectNext(45)
-                .expectNext(-1)
-                .verifyComplete()
+                .thenAwait(ofSeconds(2))
+                .thenCancel()
+                .verify(Duration.ofSeconds(1));
         ;
         verify(randomFacade, times(2)).returnNextIntForRecord(receiverRecord1);
         verify(randomFacade, atMostOnce()).returnNextIntForRecord(receiverRecord2);
