@@ -182,7 +182,7 @@ public class StepVerifierWithVirtualTimeTest {
         when(randomFacade.returnNextIntForRecord(receiverRecord1)).thenThrow(new RuntimeException("1234"));
         when(randomFacade.returnNextIntForRecord(receiverRecord2)).thenReturn(45);
         Retry retry = Retry
-                .backoff(2, ofSeconds(2))
+                .backoff(1, ofSeconds(2))
                 .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> {
 
                     return new RuntimeException("AAA");
@@ -222,7 +222,6 @@ public class StepVerifierWithVirtualTimeTest {
                 .thenAwait(ofSeconds(2))
                 .expectNext(45)
                 .expectNext(-1)
-//                .verifyTimeout(Duration.ofSeconds(1))
                 .verifyComplete()
         ;
         verify(randomFacade, times(2)).returnNextIntForRecord(receiverRecord1);

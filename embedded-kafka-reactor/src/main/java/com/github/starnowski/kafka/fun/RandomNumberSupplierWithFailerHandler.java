@@ -14,7 +14,7 @@ public class RandomNumberSupplierWithFailerHandler {
     public Flux<Integer> get(ReceiverRecord<String, String> receiverRecord)
     {
         try {
-            return Flux.just(randomFacade.returnNextIntForRecord(receiverRecord));
+            return Flux.defer(() -> Flux.just(randomFacade.returnNextIntForRecord(receiverRecord)));
         }
         catch (Exception ex)
         {
