@@ -133,6 +133,45 @@ public class StepVerifierWithVirtualTimeTest {
         verify(supplierWithFailerHandler, atMostOnce()).get(receiverRecord2);
     }
 
+    @Test
+    public void shouldProcessAllEventsEvenWhenFirstAttemptForFirstEventFailsWithRedundantDeclarationOfOnErrorContinue() {
+        // GIVEN
+        ConstantNumberSupplierWithFailerHandler supplierWithFailerHandler = mock(ConstantNumberSupplierWithFailerHandler.class);
+        ReceiverRecord<String, String> receiverRecord1 = mock(ReceiverRecord.class);
+        ReceiverRecord<String, String> receiverRecord2 = mock(ReceiverRecord.class);
+        when(supplierWithFailerHandler.get(receiverRecord1)).thenThrow(new RuntimeException("1234")).thenReturn(Flux.just(13));
+        when(supplierWithFailerHandler.get(receiverRecord2)).thenReturn(Flux.just(45));
+
+
+        // THEN
+        StepVerifier
+                .withVirtualTime(() -> Flux.just(receiverRecord1, receiverRecord2).flatMap(rr -> supplierWithFailerHandler.get(rr)
+                        )
+                                .log()
+                                .retryWhen(
+                                        Retry
+                                                .backoff(1, ofSeconds(2))
+                                                .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> {
+
+                                                    return new RuntimeException("AAA");
+                                                })
+                                                .transientErrors(true)
+                                )
+                                // Redundant declaration
+                                .onErrorContinue(throwable -> false, (throwable, o) -> {})
+                                .log()
+                )
+                .expectSubscription()
+                .expectNoEvent(Duration.ofSeconds(2))
+                .thenAwait(ofSeconds(2))
+                .thenAwait(ofSeconds(2))
+                .expectNext(13)
+                .expectNext(45)
+                .verifyComplete();
+        verify(supplierWithFailerHandler, times(2)).get(receiverRecord1);
+        verify(supplierWithFailerHandler, atMostOnce()).get(receiverRecord2);
+    }
+
 
     @Test
     @Disabled("Not yet finished")
