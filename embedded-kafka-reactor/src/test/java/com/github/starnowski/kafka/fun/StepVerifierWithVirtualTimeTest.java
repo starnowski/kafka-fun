@@ -324,7 +324,7 @@ public class StepVerifierWithVirtualTimeTest {
         Retry retry = Retry
                 .backoff(7, ofSeconds(2))
                 .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> new RuntimeException("AAA"))
-                .filter(throwable -> !SomeNonRecoverableException.class.equals(throwable.getClass()))
+                .filter(throwable -> SomeNonRecoverableException.class.equals(throwable.getClass()))
                 .transientErrors(true);
 
 
@@ -414,9 +414,6 @@ public class StepVerifierWithVirtualTimeTest {
         when(mock.toString()).thenReturn(message);
         return mock;
     }
-
-    private static final class RetryFailedException extends RuntimeException
-    {}
 
     private static final class SomeNonRecoverableException extends RuntimeException
     {}
