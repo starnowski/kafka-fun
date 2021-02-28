@@ -176,11 +176,12 @@ public class StepVerifierWithVirtualTimeTest {
     @Disabled("not yet finished")
     public void shouldProcessStreamWhenFirstFirstEventFailsForAllAttempts() {
         // GIVEN
-        ConstantNumberSupplierWithFailerHandler supplierWithFailerHandler = mock(ConstantNumberSupplierWithFailerHandler.class);
+        RandomFacade randomFacade = mock(RandomFacade.class);
+        RandomNumberSupplierWithFailerHandler supplierWithFailerHandler = new RandomNumberSupplierWithFailerHandler(randomFacade);
         ReceiverRecord<String, String> receiverRecord1 = mock(ReceiverRecord.class);
         ReceiverRecord<String, String> receiverRecord2 = mock(ReceiverRecord.class);
-        when(supplierWithFailerHandler.get(receiverRecord1)).thenThrow(new RuntimeException("1234"));
-        when(supplierWithFailerHandler.get(receiverRecord2)).thenReturn(Flux.just(45));
+        when(randomFacade.returnNextIntForRecord(receiverRecord1)).thenThrow(new RuntimeException("1234"));
+        when(randomFacade.returnNextIntForRecord(receiverRecord2)).thenReturn(45);
         Retry retry = Retry
                 .backoff(1, ofSeconds(2))
                 .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> {
