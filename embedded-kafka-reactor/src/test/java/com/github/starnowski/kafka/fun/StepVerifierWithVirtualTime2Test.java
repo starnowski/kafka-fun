@@ -1,6 +1,5 @@
 package com.github.starnowski.kafka.fun;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
@@ -24,6 +23,18 @@ public class StepVerifierWithVirtualTime2Test {
         return mock;
     }
 
+    private static boolean isErrorRecoverable(Throwable throwable, int depth) {
+        if (throwable == null) {
+            return false;
+        }
+        if (depth < 0) {
+            return false;
+        }
+        if (SomeRecoverableException.class.isAssignableFrom(throwable.getClass())) {
+            return true;
+        }
+        return isErrorRecoverable(throwable.getCause(), depth - 1);
+    }
 
     @Test
     public void shouldProcessAllEventsEvenWhenFirstAttemptForFirstEventFails() {
@@ -78,25 +89,7 @@ public class StepVerifierWithVirtualTime2Test {
         verify(receiverOffset2, times(1)).acknowledge();
     }
 
-    private static boolean isErrorRecoverable(Throwable throwable, int depth)
-    {
-        if (throwable == null)
-        {
-            return false;
-        }
-        if (depth < 0)
-        {
-            return false;
-        }
-        if (SomeRecoverableException.class.isAssignableFrom(throwable.getClass()))
-        {
-            return true;
-        }
-        return isErrorRecoverable(throwable.getCause(), depth - 1);
-    }
-
     @Test
-    @Disabled("OnError not yet implemented")
     public void shouldProcessStreamWhenFirstFirstEventFailsWithNonRecoverableExceptionAndSecondEventFailsWithRecoverableAndStreamHasSpecifiedErrorFilter() {
         // GIVEN
         ConstantNumberSupplierWithFailerHandler supplierWithFailerHandler = mock(ConstantNumberSupplierWithFailerHandler.class);
@@ -110,13 +103,6 @@ public class StepVerifierWithVirtualTime2Test {
         ReceiverOffset receiverOffset2 = mockReceiverOffset(receiverRecord2);
         ReceiverOffset receiverOffset3 = mockReceiverOffset(receiverRecord3);
 
-        Retry retry = Retry
-                .backoff(7, ofSeconds(2))
-                .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> new RuntimeException("AAA"))
-                .filter(throwable -> isErrorRecoverable(throwable, 10))
-                .transientErrors(true);
-
-
         // WHEN
         Flux<Integer> stream = Flux.just(receiverRecord1, receiverRecord2, receiverRecord3).flatMap(rr ->
                 Mono.defer(() ->
@@ -129,7 +115,16 @@ public class StepVerifierWithVirtualTime2Test {
                 }).doOnSuccess(integer ->
                 {
                     rr.receiverOffset().acknowledge();
-                }).retryWhen(retry)
+                })
+                        .onErrorMap(throwable ->
+                        {
+                            return new ReceiverRecordProcessingException(throwable, rr);
+                        })
+                        .retryWhen(Retry
+                                .backoff(7, ofSeconds(2))
+                                .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> new ReceiverRecordProcessingException(retrySignal.failure(), rr))
+                                .filter(throwable -> isErrorRecoverable(throwable, 10))
+                                .transientErrors(true))
                         .log()
                         .onErrorContinue(throwable ->
                                 {
@@ -137,6 +132,11 @@ public class StepVerifierWithVirtualTime2Test {
                                     return true;
                                 },
                                 (throwable, o) -> {
+                                    if (throwable instanceof ReceiverRecordProcessingException)
+                                    {
+                                        ReceiverRecordProcessingException exception = (ReceiverRecordProcessingException) throwable;
+                                        exception.getReceiverRecord().receiverOffset().acknowledge();
+                                    }
                                 })
                         .log()
         )
@@ -167,6 +167,19 @@ public class StepVerifierWithVirtualTime2Test {
         ReceiverOffset receiverOffset = mock(ReceiverOffset.class);
         when(receiverRecord.receiverOffset()).thenReturn(receiverOffset);
         return receiverOffset;
+    }
+
+    private static final class ReceiverRecordProcessingException extends RuntimeException {
+        final ReceiverRecord receiverRecord;
+
+        public ReceiverRecordProcessingException(Throwable cause, ReceiverRecord receiverRecord) {
+            super(cause);
+            this.receiverRecord = receiverRecord;
+        }
+
+        public ReceiverRecord getReceiverRecord() {
+            return receiverRecord;
+        }
     }
 
     private static final class SomeNonRecoverableException extends RuntimeException {
