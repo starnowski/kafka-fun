@@ -3,6 +3,7 @@ package com.github.starnowski.kafka.fun;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import reactor.core.publisher.Flux;
+import reactor.kafka.receiver.ReceiverOffset;
 import reactor.kafka.receiver.ReceiverRecord;
 import reactor.test.StepVerifier;
 import reactor.util.retry.Retry;
@@ -508,6 +509,13 @@ public class StepVerifierWithVirtualTimeTest {
 //
 //
 //    }
+
+    private ReceiverOffset mockReceiverOffset(ReceiverRecord receiverRecord)
+    {
+        ReceiverOffset receiverOffset = mock(ReceiverOffset.class);
+        when(receiverRecord.receiverOffset()).thenReturn(receiverOffset);
+        return receiverOffset;
+    }
 
     private static final class SomeNonRecoverableException extends RuntimeException {
     }
