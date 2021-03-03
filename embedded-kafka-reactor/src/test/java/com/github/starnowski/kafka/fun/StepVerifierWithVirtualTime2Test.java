@@ -1,6 +1,5 @@
 package com.github.starnowski.kafka.fun;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
@@ -26,12 +25,11 @@ public class StepVerifierWithVirtualTime2Test {
 
 
     @Test
-    @Disabled("Not yet implemented")
     public void shouldProcessAllEventsEvenWhenFirstAttemptForFirstEventFails() {
         // GIVEN
         ConstantNumberSupplierWithFailerHandler supplierWithFailerHandler = mock(ConstantNumberSupplierWithFailerHandler.class);
-        ReceiverRecord<String, String> receiverRecord1 = mock(ReceiverRecord.class);
-        ReceiverRecord<String, String> receiverRecord2 = mock(ReceiverRecord.class);
+        ReceiverRecord<String, String> receiverRecord1 = mock(ReceiverRecord.class, "record1");
+        ReceiverRecord<String, String> receiverRecord2 = mock(ReceiverRecord.class, "record2");
         ReceiverOffset receiverOffset1 = mockReceiverOffset(receiverRecord1);
         ReceiverOffset receiverOffset2 = mockReceiverOffset(receiverRecord2);
         when(supplierWithFailerHandler.getMono(receiverRecord1)).thenThrow(new RuntimeException("1234")).thenReturn(Mono.just(13));
@@ -44,14 +42,14 @@ public class StepVerifierWithVirtualTime2Test {
 
                                 Mono.defer(() ->
                                 {
-                                    try
-                                    {
+                                    try {
                                         return supplierWithFailerHandler.getMono(rr);
-                                    }
-                                    catch (Exception ex)
-                                    {
+                                    } catch (Exception ex) {
                                         throw Exceptions.propagate(ex);
                                     }
+                                }).doOnSuccess(integer ->
+                                {
+                                    rr.receiverOffset().acknowledge();
                                 })
                         )
                                 .log()
@@ -73,13 +71,12 @@ public class StepVerifierWithVirtualTime2Test {
                 .expectNext(13)
                 .expectNext(45)
                 .verifyComplete();
-        verify(supplierWithFailerHandler, times(2)).get(receiverRecord1);
-        verify(supplierWithFailerHandler, times(1)).get(receiverRecord2);
+        verify(supplierWithFailerHandler, times(2)).getMono(receiverRecord1);
+        verify(supplierWithFailerHandler, times(1)).getMono(receiverRecord2);
         verify(receiverOffset1, times(1)).acknowledge();
         verify(receiverOffset2, times(1)).acknowledge();
 
     }
-
 
 
     private ReceiverOffset mockReceiverOffset(ReceiverRecord receiverRecord) {
