@@ -1,6 +1,5 @@
 package com.github.starnowski.kafka.fun;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import reactor.core.publisher.Flux;
@@ -16,6 +15,12 @@ import static org.mockito.Mockito.*;
 
 public class StepVerifierWithVirtualTimeTest {
 
+
+    private static <T> T mockWithMockedToString(Class<T> classToMock, String message) {
+        T mock = mock(classToMock);
+        when(mock.toString()).thenReturn(message);
+        return mock;
+    }
 
     @Test
     public void shouldCompleteAfterFirstAttemptFailedWithVirtualTime() {
@@ -51,7 +56,7 @@ public class StepVerifierWithVirtualTimeTest {
                 .withVirtualTime(() -> Flux.just(receiverRecord).flatMap(rr -> supplierWithFailerHandler.get(rr)
                         )
                                 .retryWhen(Retry.backoff(1, ofSeconds(2)))
-                        .log()
+                                .log()
                 )
                 .expectSubscription()
                 .expectNoEvent(ofSeconds(2))
@@ -74,7 +79,7 @@ public class StepVerifierWithVirtualTimeTest {
         StepVerifier
                 .withVirtualTime(() -> Flux.just(receiverRecord1, receiverRecord2).flatMap(rr -> supplierWithFailerHandler.get(rr)
                         )
-                        .log()
+                                .log()
                                 .retryWhen(
                                         Retry
                                                 .backoff(1, ofSeconds(2))
@@ -90,8 +95,8 @@ public class StepVerifierWithVirtualTimeTest {
                 .expectNext(13)
                 .expectNext(45)
                 .verifyComplete();
-        verify(supplierWithFailerHandler, atMostOnce()).get(receiverRecord1);
-        verify(supplierWithFailerHandler, atMostOnce()).get(receiverRecord2);
+        verify(supplierWithFailerHandler, times(1)).get(receiverRecord1);
+        verify(supplierWithFailerHandler, times(1)).get(receiverRecord2);
     }
 
     @Test
@@ -128,7 +133,7 @@ public class StepVerifierWithVirtualTimeTest {
                 .expectNext(45)
                 .verifyComplete();
         verify(supplierWithFailerHandler, times(2)).get(receiverRecord1);
-        verify(supplierWithFailerHandler, atMostOnce()).get(receiverRecord2);
+        verify(supplierWithFailerHandler, times(1)).get(receiverRecord2);
     }
 
     @Test
@@ -156,7 +161,8 @@ public class StepVerifierWithVirtualTimeTest {
                                                 .transientErrors(true)
                                 )
                                 // Redundant declaration
-                                .onErrorContinue(throwable -> false, (throwable, o) -> {})
+                                .onErrorContinue(throwable -> false, (throwable, o) -> {
+                                })
                                 .log()
                 )
                 .expectSubscription()
@@ -167,7 +173,7 @@ public class StepVerifierWithVirtualTimeTest {
                 .expectNext(45)
                 .verifyComplete();
         verify(supplierWithFailerHandler, times(2)).get(receiverRecord1);
-        verify(supplierWithFailerHandler, atMostOnce()).get(receiverRecord2);
+        verify(supplierWithFailerHandler, times(1)).get(receiverRecord2);
     }
 
     @Test
@@ -192,7 +198,7 @@ public class StepVerifierWithVirtualTimeTest {
                 {
                     System.out.println("Error in stream: " + throwable);
                     return true;
-                },-1)
+                }, -1)
                 .log()
         )
                 .log();
@@ -210,7 +216,7 @@ public class StepVerifierWithVirtualTimeTest {
                 .verifyComplete()
         ;
         verify(randomFacade, times(2)).returnNextIntForRecord(receiverRecord1);
-        verify(randomFacade, atMostOnce()).returnNextIntForRecord(receiverRecord2);
+        verify(randomFacade, times(1)).returnNextIntForRecord(receiverRecord2);
     }
 
     @Test
@@ -233,11 +239,12 @@ public class StepVerifierWithVirtualTimeTest {
         Flux<Integer> stream = Flux.just(receiverRecord1, receiverRecord2).flatMap(rr -> supplierWithFailerHandler.get(rr).retryWhen(retry)
                 .log()
                 .onErrorContinue(throwable ->
-                {
-                    System.out.println("Error in stream: " + throwable);
-                    return true;
-                },
-                        (throwable, o) -> {})
+                        {
+                            System.out.println("Error in stream: " + throwable);
+                            return true;
+                        },
+                        (throwable, o) -> {
+                        })
                 .log()
         )
                 .log();
@@ -255,7 +262,7 @@ public class StepVerifierWithVirtualTimeTest {
                 .verify(Duration.ofSeconds(1));
         ;
         verify(randomFacade, times(2)).returnNextIntForRecord(receiverRecord1);
-        verify(randomFacade, atMostOnce()).returnNextIntForRecord(receiverRecord2);
+        verify(randomFacade, times(1)).returnNextIntForRecord(receiverRecord2);
         // Verify order
         inOrder.verify(randomFacade).returnNextIntForRecord(receiverRecord1);
         inOrder.verify(randomFacade).returnNextIntForRecord(receiverRecord2);
@@ -286,7 +293,8 @@ public class StepVerifierWithVirtualTimeTest {
                             System.out.println("Error in stream: " + throwable);
                             return true;
                         },
-                        (throwable, o) -> {})
+                        (throwable, o) -> {
+                        })
                 .log()
         )
                 .log();
@@ -304,7 +312,7 @@ public class StepVerifierWithVirtualTimeTest {
                 .verify(Duration.ofSeconds(1));
         ;
         verify(randomFacade, times(8)).returnNextIntForRecord(receiverRecord1);
-        verify(randomFacade, atMostOnce()).returnNextIntForRecord(receiverRecord2);
+        verify(randomFacade, times(1)).returnNextIntForRecord(receiverRecord2);
         // Verify order
         inOrder.verify(randomFacade).returnNextIntForRecord(receiverRecord1);
         inOrder.verify(randomFacade).returnNextIntForRecord(receiverRecord2);
@@ -336,7 +344,8 @@ public class StepVerifierWithVirtualTimeTest {
                             System.out.println("Error in stream: " + throwable);
                             return true;
                         },
-                        (throwable, o) -> {})
+                        (throwable, o) -> {
+                        })
                 .log()
         )
                 .log();
@@ -353,7 +362,7 @@ public class StepVerifierWithVirtualTimeTest {
                 .thenCancel()
                 .verify(Duration.ofSeconds(1));
         verify(randomFacade, times(8)).returnNextIntForRecord(receiverRecord1);
-        verify(randomFacade, atMostOnce()).returnNextIntForRecord(receiverRecord2);
+        verify(randomFacade, times(1)).returnNextIntForRecord(receiverRecord2);
         // Verify order
         inOrder.verify(randomFacade).returnNextIntForRecord(receiverRecord1);
         inOrder.verify(randomFacade).returnNextIntForRecord(receiverRecord2);
@@ -385,7 +394,8 @@ public class StepVerifierWithVirtualTimeTest {
                             System.out.println("Error in stream: " + throwable);
                             return true;
                         },
-                        (throwable, o) -> {})
+                        (throwable, o) -> {
+                        })
                 .log()
         )
                 .log();
@@ -399,8 +409,8 @@ public class StepVerifierWithVirtualTimeTest {
                 .expectNext(89)
                 .thenCancel()
                 .verify(Duration.ofSeconds(1));
-        verify(randomFacade, atMostOnce()).returnNextIntForRecord(receiverRecord1);
-        verify(randomFacade, atMostOnce()).returnNextIntForRecord(receiverRecord2);
+        verify(randomFacade, times(1)).returnNextIntForRecord(receiverRecord1);
+        verify(randomFacade, times(1)).returnNextIntForRecord(receiverRecord2);
         // Verify order
         inOrder.verify(randomFacade).returnNextIntForRecord(receiverRecord1);
         inOrder.verify(randomFacade).returnNextIntForRecord(receiverRecord2);
@@ -433,7 +443,8 @@ public class StepVerifierWithVirtualTimeTest {
                             System.out.println("Error in stream: " + throwable);
                             return true;
                         },
-                        (throwable, o) -> {})
+                        (throwable, o) -> {
+                        })
                 .log()
         )
                 .log();
@@ -449,9 +460,9 @@ public class StepVerifierWithVirtualTimeTest {
                 .thenAwait(ofSeconds(360))// >= (2 * 2 ^ 1) + (2 * 2 ^ 2) + (2 * 2 ^ 3) + (2 * 2 ^ 4) + (2 * 2 ^ 5) + (2 * 2 ^ 6) + (2 * 2 ^ 7) [s]
                 .thenCancel()
                 .verify(Duration.ofSeconds(1));
-        verify(randomFacade, atMostOnce()).returnNextIntForRecord(receiverRecord1);
+        verify(randomFacade, times(1)).returnNextIntForRecord(receiverRecord1);
         verify(randomFacade, times(8)).returnNextIntForRecord(receiverRecord2);
-        verify(randomFacade, atMostOnce()).returnNextIntForRecord(receiverRecord3);
+        verify(randomFacade, times(1)).returnNextIntForRecord(receiverRecord3);
         // Verify order
         inOrder.verify(randomFacade).returnNextIntForRecord(receiverRecord1);
         inOrder.verify(randomFacade).returnNextIntForRecord(receiverRecord2);
@@ -459,16 +470,48 @@ public class StepVerifierWithVirtualTimeTest {
         inOrder.verify(randomFacade, times(7)).returnNextIntForRecord(receiverRecord2);
     }
 
+//    @Test
+//    public void shouldProcessAllEventsEvenWhenFirstAttemptForFirstEventFailsAndXXXXXXXXX() {
+//        // GIVEN
+//        ConstantNumberSupplierWithFailerHandler supplierWithFailerHandler = mock(ConstantNumberSupplierWithFailerHandler.class);
+//        ReceiverRecord<String, String> receiverRecord1 = mock(ReceiverRecord.class);
+//        ReceiverRecord<String, String> receiverRecord2 = mock(ReceiverRecord.class);
+//        when(supplierWithFailerHandler.get(receiverRecord1)).thenThrow(new RuntimeException("1234")).thenReturn(Flux.just(13));
+//        when(supplierWithFailerHandler.get(receiverRecord2)).thenReturn(Flux.just(45));
+//
+//
+//        // THEN
+//        StepVerifier
+//                .withVirtualTime(() -> Flux.just(receiverRecord1, receiverRecord2).flatMap(rr -> supplierWithFailerHandler.get(rr)
+//                        )
+//                                .log()
+//                                .retryWhen(
+//                                        Retry
+//                                                .backoff(1, ofSeconds(2))
+//                                                .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> {
+//
+//                                                    return new RuntimeException("AAA");
+//                                                })
+//                                                .transientErrors(true)
+//                                )
+//                                .log()
+//                )
+//                .expectSubscription()
+//                .expectNoEvent(Duration.ofSeconds(2))
+//                .thenAwait(ofSeconds(2))
+//                .thenAwait(ofSeconds(2))
+//                .expectNext(13)
+//                .expectNext(45)
+//                .verifyComplete();
+//        verify(supplierWithFailerHandler, times(2)).get(receiverRecord1);
+//        verify(supplierWithFailerHandler, times(1)).get(receiverRecord2);
+//
+//
+//    }
 
-    private static <T> T mockWithMockedToString(Class<T> classToMock, String message) {
-        T mock = mock(classToMock);
-        when(mock.toString()).thenReturn(message);
-        return mock;
+    private static final class SomeNonRecoverableException extends RuntimeException {
     }
 
-    private static final class SomeNonRecoverableException extends RuntimeException
-    {}
-
-    private static final class SomeRecoverableException extends RuntimeException
-    {}
+    private static final class SomeRecoverableException extends RuntimeException {
+    }
 }
