@@ -3,7 +3,6 @@ package com.github.starnowski.kafka.fun;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import reactor.core.publisher.Flux;
-import reactor.kafka.receiver.ReceiverOffset;
 import reactor.kafka.receiver.ReceiverRecord;
 import reactor.test.StepVerifier;
 import reactor.util.retry.Retry;
@@ -469,52 +468,6 @@ public class StepVerifierWithVirtualTimeTest {
         inOrder.verify(randomFacade).returnNextIntForRecord(receiverRecord2);
         inOrder.verify(randomFacade).returnNextIntForRecord(receiverRecord3);
         inOrder.verify(randomFacade, times(7)).returnNextIntForRecord(receiverRecord2);
-    }
-
-//    @Test
-//    public void shouldProcessAllEventsEvenWhenFirstAttemptForFirstEventFailsAndXXXXXXXXX() {
-//        // GIVEN
-//        ConstantNumberSupplierWithFailerHandler supplierWithFailerHandler = mock(ConstantNumberSupplierWithFailerHandler.class);
-//        ReceiverRecord<String, String> receiverRecord1 = mock(ReceiverRecord.class);
-//        ReceiverRecord<String, String> receiverRecord2 = mock(ReceiverRecord.class);
-//        when(supplierWithFailerHandler.get(receiverRecord1)).thenThrow(new RuntimeException("1234")).thenReturn(Flux.just(13));
-//        when(supplierWithFailerHandler.get(receiverRecord2)).thenReturn(Flux.just(45));
-//
-//
-//        // THEN
-//        StepVerifier
-//                .withVirtualTime(() -> Flux.just(receiverRecord1, receiverRecord2).flatMap(rr -> supplierWithFailerHandler.get(rr)
-//                        )
-//                                .log()
-//                                .retryWhen(
-//                                        Retry
-//                                                .backoff(1, ofSeconds(2))
-//                                                .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> {
-//
-//                                                    return new RuntimeException("AAA");
-//                                                })
-//                                                .transientErrors(true)
-//                                )
-//                                .log()
-//                )
-//                .expectSubscription()
-//                .expectNoEvent(Duration.ofSeconds(2))
-//                .thenAwait(ofSeconds(2))
-//                .thenAwait(ofSeconds(2))
-//                .expectNext(13)
-//                .expectNext(45)
-//                .verifyComplete();
-//        verify(supplierWithFailerHandler, times(2)).get(receiverRecord1);
-//        verify(supplierWithFailerHandler, times(1)).get(receiverRecord2);
-//
-//
-//    }
-
-    private ReceiverOffset mockReceiverOffset(ReceiverRecord receiverRecord)
-    {
-        ReceiverOffset receiverOffset = mock(ReceiverOffset.class);
-        when(receiverRecord.receiverOffset()).thenReturn(receiverOffset);
-        return receiverOffset;
     }
 
     private static final class SomeNonRecoverableException extends RuntimeException {

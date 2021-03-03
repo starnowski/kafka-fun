@@ -75,7 +75,6 @@ public class StepVerifierWithVirtualTime2Test {
         verify(supplierWithFailerHandler, times(1)).getMono(receiverRecord2);
         verify(receiverOffset1, times(1)).acknowledge();
         verify(receiverOffset2, times(1)).acknowledge();
-
     }
 
 
