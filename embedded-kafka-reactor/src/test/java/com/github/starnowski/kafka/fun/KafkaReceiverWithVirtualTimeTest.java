@@ -5,7 +5,6 @@ import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -15,7 +14,6 @@ import org.springframework.test.annotation.DirtiesContext;
 import reactor.core.publisher.Flux;
 import reactor.kafka.receiver.KafkaReceiver;
 import reactor.kafka.receiver.ReceiverOptions;
-import reactor.kafka.receiver.ReceiverRecord;
 import reactor.test.StepVerifier;
 import reactor.util.retry.Retry;
 
@@ -68,7 +66,7 @@ public class KafkaReceiverWithVirtualTimeTest {
         String expectedValue = "SSS" + random.nextInt();
 
         //WHEN
-        Flux stream = receiver.receive().flatMap(rr -> supplierWithFailerHandler.get(rr))
+        Flux stream = receiver.receive().flatMap(rr -> supplierWithFailerHandler.getFlux(rr))
                 .retryWhen(Retry.backoff(1, Duration.ofSeconds(2)));
 
         //THEN

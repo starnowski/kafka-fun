@@ -17,7 +17,7 @@ public class ConstantNumberSupplierWithFailerHandler {
         return current;
     }
 
-    public Flux<Integer> get(ReceiverRecord<String, String> receiverRecord) {
+    public Flux<Integer> getFlux(ReceiverRecord<String, String> receiverRecord) {
         current++;
         if (current < maxAttempt) {
             throw new RuntimeException("xxx");

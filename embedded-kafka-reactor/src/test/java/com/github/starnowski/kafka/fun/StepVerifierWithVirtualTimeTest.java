@@ -31,7 +31,7 @@ public class StepVerifierWithVirtualTimeTest {
         // THEN
         StepVerifier
                 .withVirtualTime(() -> Flux.just(receiverRecord)
-                        .flatMap(rr -> supplierWithFailerHandler.get(rr))
+                        .flatMap(rr -> supplierWithFailerHandler.getFlux(rr))
                         .log()
                         .retryWhen(Retry.backoff(1, ofSeconds(2)))
                         .log()
@@ -53,7 +53,7 @@ public class StepVerifierWithVirtualTimeTest {
 
         // THEN
         StepVerifier
-                .withVirtualTime(() -> Flux.just(receiverRecord).flatMap(rr -> supplierWithFailerHandler.get(rr)
+                .withVirtualTime(() -> Flux.just(receiverRecord).flatMap(rr -> supplierWithFailerHandler.getFlux(rr)
                         )
                                 .retryWhen(Retry.backoff(1, ofSeconds(2)))
                                 .log()
@@ -71,13 +71,13 @@ public class StepVerifierWithVirtualTimeTest {
         ConstantNumberSupplierWithFailerHandler supplierWithFailerHandler = mock(ConstantNumberSupplierWithFailerHandler.class);
         ReceiverRecord<String, String> receiverRecord1 = mock(ReceiverRecord.class);
         ReceiverRecord<String, String> receiverRecord2 = mock(ReceiverRecord.class);
-        when(supplierWithFailerHandler.get(receiverRecord1)).thenReturn(Flux.just(13));
-        when(supplierWithFailerHandler.get(receiverRecord2)).thenReturn(Flux.just(45));
+        when(supplierWithFailerHandler.getFlux(receiverRecord1)).thenReturn(Flux.just(13));
+        when(supplierWithFailerHandler.getFlux(receiverRecord2)).thenReturn(Flux.just(45));
 
 
         // THEN
         StepVerifier
-                .withVirtualTime(() -> Flux.just(receiverRecord1, receiverRecord2).flatMap(rr -> supplierWithFailerHandler.get(rr)
+                .withVirtualTime(() -> Flux.just(receiverRecord1, receiverRecord2).flatMap(rr -> supplierWithFailerHandler.getFlux(rr)
                         )
                                 .log()
                                 .retryWhen(
@@ -95,8 +95,8 @@ public class StepVerifierWithVirtualTimeTest {
                 .expectNext(13)
                 .expectNext(45)
                 .verifyComplete();
-        verify(supplierWithFailerHandler, times(1)).get(receiverRecord1);
-        verify(supplierWithFailerHandler, times(1)).get(receiverRecord2);
+        verify(supplierWithFailerHandler, times(1)).getFlux(receiverRecord1);
+        verify(supplierWithFailerHandler, times(1)).getFlux(receiverRecord2);
     }
 
     @Test
@@ -105,13 +105,13 @@ public class StepVerifierWithVirtualTimeTest {
         ConstantNumberSupplierWithFailerHandler supplierWithFailerHandler = mock(ConstantNumberSupplierWithFailerHandler.class);
         ReceiverRecord<String, String> receiverRecord1 = mock(ReceiverRecord.class);
         ReceiverRecord<String, String> receiverRecord2 = mock(ReceiverRecord.class);
-        when(supplierWithFailerHandler.get(receiverRecord1)).thenThrow(new RuntimeException("1234")).thenReturn(Flux.just(13));
-        when(supplierWithFailerHandler.get(receiverRecord2)).thenReturn(Flux.just(45));
+        when(supplierWithFailerHandler.getFlux(receiverRecord1)).thenThrow(new RuntimeException("1234")).thenReturn(Flux.just(13));
+        when(supplierWithFailerHandler.getFlux(receiverRecord2)).thenReturn(Flux.just(45));
 
 
         // THEN
         StepVerifier
-                .withVirtualTime(() -> Flux.just(receiverRecord1, receiverRecord2).flatMap(rr -> supplierWithFailerHandler.get(rr)
+                .withVirtualTime(() -> Flux.just(receiverRecord1, receiverRecord2).flatMap(rr -> supplierWithFailerHandler.getFlux(rr)
                         )
                                 .log()
                                 .retryWhen(
@@ -132,8 +132,8 @@ public class StepVerifierWithVirtualTimeTest {
                 .expectNext(13)
                 .expectNext(45)
                 .verifyComplete();
-        verify(supplierWithFailerHandler, times(2)).get(receiverRecord1);
-        verify(supplierWithFailerHandler, times(1)).get(receiverRecord2);
+        verify(supplierWithFailerHandler, times(2)).getFlux(receiverRecord1);
+        verify(supplierWithFailerHandler, times(1)).getFlux(receiverRecord2);
     }
 
     @Test
@@ -142,13 +142,13 @@ public class StepVerifierWithVirtualTimeTest {
         ConstantNumberSupplierWithFailerHandler supplierWithFailerHandler = mock(ConstantNumberSupplierWithFailerHandler.class);
         ReceiverRecord<String, String> receiverRecord1 = mock(ReceiverRecord.class);
         ReceiverRecord<String, String> receiverRecord2 = mock(ReceiverRecord.class);
-        when(supplierWithFailerHandler.get(receiverRecord1)).thenThrow(new RuntimeException("1234")).thenReturn(Flux.just(13));
-        when(supplierWithFailerHandler.get(receiverRecord2)).thenReturn(Flux.just(45));
+        when(supplierWithFailerHandler.getFlux(receiverRecord1)).thenThrow(new RuntimeException("1234")).thenReturn(Flux.just(13));
+        when(supplierWithFailerHandler.getFlux(receiverRecord2)).thenReturn(Flux.just(45));
 
 
         // THEN
         StepVerifier
-                .withVirtualTime(() -> Flux.just(receiverRecord1, receiverRecord2).flatMap(rr -> supplierWithFailerHandler.get(rr)
+                .withVirtualTime(() -> Flux.just(receiverRecord1, receiverRecord2).flatMap(rr -> supplierWithFailerHandler.getFlux(rr)
                         )
                                 .log()
                                 .retryWhen(
@@ -172,8 +172,8 @@ public class StepVerifierWithVirtualTimeTest {
                 .expectNext(13)
                 .expectNext(45)
                 .verifyComplete();
-        verify(supplierWithFailerHandler, times(2)).get(receiverRecord1);
-        verify(supplierWithFailerHandler, times(1)).get(receiverRecord2);
+        verify(supplierWithFailerHandler, times(2)).getFlux(receiverRecord1);
+        verify(supplierWithFailerHandler, times(1)).getFlux(receiverRecord2);
     }
 
     @Test
