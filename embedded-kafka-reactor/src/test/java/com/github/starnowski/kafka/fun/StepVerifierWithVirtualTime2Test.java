@@ -78,6 +78,23 @@ public class StepVerifierWithVirtualTime2Test {
         verify(receiverOffset2, times(1)).acknowledge();
     }
 
+    private static boolean isErrorRecoverable(Throwable throwable, int depth)
+    {
+        if (throwable == null)
+        {
+            return false;
+        }
+        if (depth < 0)
+        {
+            return false;
+        }
+        if (SomeRecoverableException.class.isAssignableFrom(throwable.getClass()))
+        {
+            return true;
+        }
+        return isErrorRecoverable(throwable.getCause(), depth - 1);
+    }
+
     @Test
     @Disabled("OnError not yet implemented")
     public void shouldProcessStreamWhenFirstFirstEventFailsWithNonRecoverableExceptionAndSecondEventFailsWithRecoverableAndStreamHasSpecifiedErrorFilter() {
@@ -96,7 +113,7 @@ public class StepVerifierWithVirtualTime2Test {
         Retry retry = Retry
                 .backoff(7, ofSeconds(2))
                 .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> new RuntimeException("AAA"))
-                .filter(throwable -> !SomeNonRecoverableException.class.equals(throwable.getClass()))
+                .filter(throwable -> isErrorRecoverable(throwable, 10))
                 .transientErrors(true);
 
 
