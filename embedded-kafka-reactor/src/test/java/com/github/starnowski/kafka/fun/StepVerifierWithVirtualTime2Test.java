@@ -1,7 +1,7 @@
 package com.github.starnowski.kafka.fun;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.mockito.InOrder;
 import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -79,17 +79,20 @@ public class StepVerifierWithVirtualTime2Test {
     }
 
     @Test
+    @Disabled("OnError not yet implemented")
     public void shouldProcessStreamWhenFirstFirstEventFailsWithNonRecoverableExceptionAndSecondEventFailsWithRecoverableAndStreamHasSpecifiedErrorFilter() {
         // GIVEN
-        RandomFacade randomFacade = mock(RandomFacade.class);
-        RandomNumberSupplierWithFailerHandler supplierWithFailerHandler = new RandomNumberSupplierWithFailerHandler(randomFacade);
+        ConstantNumberSupplierWithFailerHandler supplierWithFailerHandler = mock(ConstantNumberSupplierWithFailerHandler.class);
         ReceiverRecord<String, String> receiverRecord1 = mockWithMockedToString(ReceiverRecord.class, "record1");
         ReceiverRecord<String, String> receiverRecord2 = mockWithMockedToString(ReceiverRecord.class, "record2");
-        ReceiverRecord<String, String> receiverRecord3 = mockWithMockedToString(ReceiverRecord.class, "record2");
-        when(randomFacade.returnNextIntForRecord(receiverRecord1)).thenThrow(new SomeNonRecoverableException());
-        when(randomFacade.returnNextIntForRecord(receiverRecord2)).thenThrow(new SomeRecoverableException());
-        when(randomFacade.returnNextIntForRecord(receiverRecord3)).thenReturn(17);
-        InOrder inOrder = inOrder(randomFacade);
+        ReceiverRecord<String, String> receiverRecord3 = mockWithMockedToString(ReceiverRecord.class, "record3");
+        when(supplierWithFailerHandler.getMono(receiverRecord1)).thenThrow(new SomeNonRecoverableException());
+        when(supplierWithFailerHandler.getMono(receiverRecord2)).thenThrow(new SomeRecoverableException());
+        when(supplierWithFailerHandler.getMono(receiverRecord3)).thenReturn(Mono.just(97));
+        ReceiverOffset receiverOffset1 = mockReceiverOffset(receiverRecord1);
+        ReceiverOffset receiverOffset2 = mockReceiverOffset(receiverRecord2);
+        ReceiverOffset receiverOffset3 = mockReceiverOffset(receiverRecord3);
+
         Retry retry = Retry
                 .backoff(7, ofSeconds(2))
                 .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> new RuntimeException("AAA"))
@@ -98,16 +101,27 @@ public class StepVerifierWithVirtualTime2Test {
 
 
         // WHEN
-        Flux<Integer> stream = Flux.just(receiverRecord1, receiverRecord2, receiverRecord3).flatMap(rr -> supplierWithFailerHandler.get(rr).retryWhen(retry)
-                .log()
-                .onErrorContinue(throwable ->
-                        {
-                            System.out.println("Error in stream: " + throwable);
-                            return true;
-                        },
-                        (throwable, o) -> {
-                        })
-                .log()
+        Flux<Integer> stream = Flux.just(receiverRecord1, receiverRecord2, receiverRecord3).flatMap(rr ->
+                Mono.defer(() ->
+                {
+                    try {
+                        return supplierWithFailerHandler.getMono(rr);
+                    } catch (Exception ex) {
+                        throw Exceptions.propagate(ex);
+                    }
+                }).doOnSuccess(integer ->
+                {
+                    rr.receiverOffset().acknowledge();
+                }).retryWhen(retry)
+                        .log()
+                        .onErrorContinue(throwable ->
+                                {
+                                    System.out.println("Error in stream: " + throwable);
+                                    return true;
+                                },
+                                (throwable, o) -> {
+                                })
+                        .log()
         )
                 .log();
 
@@ -118,18 +132,17 @@ public class StepVerifierWithVirtualTime2Test {
                 .expectSubscription()
                 .expectNoEvent(Duration.ofSeconds(2))
                 .expectNoEvent(Duration.ofSeconds(2))
-                .expectNext(17)
+                .expectNext(97)
                 .thenAwait(ofSeconds(360))// >= (2 * 2 ^ 1) + (2 * 2 ^ 2) + (2 * 2 ^ 3) + (2 * 2 ^ 4) + (2 * 2 ^ 5) + (2 * 2 ^ 6) + (2 * 2 ^ 7) [s]
                 .thenCancel()
                 .verify(Duration.ofSeconds(1));
-        verify(randomFacade, times(1)).returnNextIntForRecord(receiverRecord1);
-        verify(randomFacade, times(8)).returnNextIntForRecord(receiverRecord2);
-        verify(randomFacade, times(1)).returnNextIntForRecord(receiverRecord3);
-        // Verify order
-        inOrder.verify(randomFacade).returnNextIntForRecord(receiverRecord1);
-        inOrder.verify(randomFacade).returnNextIntForRecord(receiverRecord2);
-        inOrder.verify(randomFacade).returnNextIntForRecord(receiverRecord3);
-        inOrder.verify(randomFacade, times(7)).returnNextIntForRecord(receiverRecord2);
+        verify(supplierWithFailerHandler, times(1)).getMono(receiverRecord1);
+        verify(supplierWithFailerHandler, times(8)).getMono(receiverRecord2);
+        verify(supplierWithFailerHandler, times(1)).getMono(receiverRecord3);
+
+        verify(receiverOffset1, times(1)).acknowledge();
+        verify(receiverOffset2, times(1)).acknowledge();
+        verify(receiverOffset3, times(1)).acknowledge();
     }
 
 
