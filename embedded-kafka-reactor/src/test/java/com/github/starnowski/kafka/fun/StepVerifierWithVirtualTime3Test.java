@@ -16,6 +16,8 @@ import static org.mockito.Mockito.*;
 
 public class StepVerifierWithVirtualTime3Test {
 
+    private static final int MAX_ATTEMPTS = 7;
+    private static final int MAX_DELAY_IN_SECONDS = 7;
 
     private static Flux<Integer> testedPipeline(Flux<ReceiverRecord<String, String>> source, ConstantNumberSupplierWithFailerHandler handler) {
         return source.flatMap(rr ->
@@ -39,23 +41,10 @@ public class StepVerifierWithVirtualTime3Test {
                             return new ReceiverRecordProcessingException(throwable, rr);
                         })
                         .retryWhen(Retry
-                                .backoff(7, ofSeconds(2))
+                                .backoff(MAX_ATTEMPTS, ofSeconds(MAX_DELAY_IN_SECONDS))
                                 .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> new ReceiverRecordProcessingException(retrySignal.failure(), rr))
                                 .filter(throwable -> isErrorRecoverable(throwable, 10))
                                 .transientErrors(true))
-//                        .log()
-//                        .onErrorContinue(throwable ->
-//                                {
-//                                    System.out.println("Error in stream: " + throwable);
-//                                    return true;
-//                                },
-//                                (throwable, o) -> {
-//                                    if (throwable instanceof ReceiverRecordProcessingException) {
-//                                        ReceiverRecordProcessingException exception = (ReceiverRecordProcessingException) throwable;
-//                                        exception.getReceiverRecord().receiverOffset().acknowledge();
-//                                    }
-//                                })
-//                        .log()
         )
                 .doOnError(throwable ->
                 {
@@ -95,58 +84,35 @@ public class StepVerifierWithVirtualTime3Test {
         return isErrorRecoverable(throwable.getCause(), depth - 1);
     }
 
-//    @Test
-//    public void shouldProcessAllEventsEvenWhenFirstAttemptForFirstEventFails() {
-//        // GIVEN
-//        ConstantNumberSupplierWithFailerHandler supplierWithFailerHandler = mock(ConstantNumberSupplierWithFailerHandler.class);
-//        ReceiverRecord<String, String> receiverRecord1 = mock(ReceiverRecord.class, "record1");
-//        ReceiverRecord<String, String> receiverRecord2 = mock(ReceiverRecord.class, "record2");
-//        ReceiverOffset receiverOffset1 = mockReceiverOffset(receiverRecord1);
-//        ReceiverOffset receiverOffset2 = mockReceiverOffset(receiverRecord2);
-//        when(supplierWithFailerHandler.getMono(receiverRecord1)).thenThrow(new RuntimeException("1234")).thenReturn(Mono.just(13));
-//        when(supplierWithFailerHandler.getMono(receiverRecord2)).thenReturn(Mono.just(45));
-//
-//
-//        // THEN
-//        StepVerifier
-//                .withVirtualTime(() -> Flux.just(receiverRecord1, receiverRecord2).flatMap(rr ->
-//
-//                                Mono.defer(() ->
-//                                {
-//                                    try {
-//                                        return supplierWithFailerHandler.getMono(rr);
-//                                    } catch (Exception ex) {
-//                                        throw Exceptions.propagate(ex);
-//                                    }
-//                                }).doOnSuccess(integer ->
-//                                {
-//                                    rr.receiverOffset().acknowledge();
-//                                })
-//                        )
-//                                .log()
-//                                .retryWhen(
-//                                        Retry
-//                                                .backoff(1, ofSeconds(2))
-//                                                .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> {
-//
-//                                                    return new RuntimeException("AAA");
-//                                                })
-//                                                .transientErrors(true)
-//                                )
-//                                .log()
-//                )
-//                .expectSubscription()
-//                .expectNoEvent(Duration.ofSeconds(2))
-//                .thenAwait(ofSeconds(2))
-//                .thenAwait(ofSeconds(2))
-//                .expectNext(13)
-//                .expectNext(45)
-//                .verifyComplete();
-//        verify(supplierWithFailerHandler, times(2)).getMono(receiverRecord1);
-//        verify(supplierWithFailerHandler, times(1)).getMono(receiverRecord2);
-//        verify(receiverOffset1, times(1)).acknowledge();
-//        verify(receiverOffset2, times(1)).acknowledge();
-//    }
+    @Test
+    public void shouldProcessAllEventsEvenWhenFirstAttemptForFirstEventFails() {
+        // GIVEN
+        ConstantNumberSupplierWithFailerHandler handler = mock(ConstantNumberSupplierWithFailerHandler.class);
+        ReceiverRecord<String, String> receiverRecord1 = mock(ReceiverRecord.class, "record1");
+        ReceiverRecord<String, String> receiverRecord2 = mock(ReceiverRecord.class, "record2");
+        ReceiverOffset receiverOffset1 = mockReceiverOffset(receiverRecord1);
+        ReceiverOffset receiverOffset2 = mockReceiverOffset(receiverRecord2);
+        when(handler.getMono(receiverRecord1)).thenThrow(new SomeRecoverableException()).thenReturn(Mono.just(13));
+        when(handler.getMono(receiverRecord2)).thenReturn(Mono.just(45));
+
+        // WHEN
+        Flux<Integer> stream = testedPipeline(Flux.just(receiverRecord1, receiverRecord2), handler);
+
+        // THEN
+        StepVerifier
+                .withVirtualTime(() -> stream)
+                .expectSubscription()
+                .expectNoEvent(Duration.ofSeconds(2))
+                .thenAwait(ofSeconds(MAX_DELAY_IN_SECONDS))
+                .expectNext(45)
+                .thenAwait(ofSeconds(MAX_DELAY_IN_SECONDS))
+                .expectNext(13)
+                .verifyComplete();
+        verify(handler, times(2)).getMono(receiverRecord1);
+        verify(handler, times(1)).getMono(receiverRecord2);
+        verify(receiverOffset1, times(1)).acknowledge();
+        verify(receiverOffset2, times(1)).acknowledge();
+    }
 
     @Test
     public void shouldProcessStreamWhenFirstFirstEventFailsWithNonRecoverableExceptionAndSecondEventFailsWithRecoverableAndStreamHasSpecifiedErrorFilter() {
