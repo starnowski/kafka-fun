@@ -201,9 +201,8 @@ public class StepVerifierWithVirtualTime2Test {
         verify(receiverOffset1, Mockito.never()).acknowledge();
     }
 
-    //TODO Rename tests case
     @Test
-    public void shouldNotMapErrorWhenCheckedExceptionIsPropagatedAsReactiveExceptionXXXXX() {
+    public void shouldNMapErrorWhenCheckedExceptionIsPropagatedAsReactiveException() {
         // GIVEN
         ConstantNumberSupplierWithFailerHandler supplierWithFailerHandler = mock(ConstantNumberSupplierWithFailerHandler.class);
         ReceiverRecord<String, String> receiverRecord1 = mock(ReceiverRecord.class, "record1");
