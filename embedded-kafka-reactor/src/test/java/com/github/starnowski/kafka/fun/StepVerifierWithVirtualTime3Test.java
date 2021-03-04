@@ -24,6 +24,10 @@ public class StepVerifierWithVirtualTime3Test {
                     try {
                         return handler.getMono(rr);
                     } catch (Exception ex) {
+                        /*
+                         * This is not good practice (it is better to return Mono.error(ex)) but we want to simulate a
+                         * case when a component from the lower layer does not stick to this rule.
+                         */
                         throw Exceptions.propagate(ex);
                     }
                 }).doOnSuccess(integer ->
