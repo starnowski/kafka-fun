@@ -133,8 +133,7 @@ public class StepVerifierWithVirtualTime2Test {
                                     return true;
                                 },
                                 (throwable, o) -> {
-                                    if (throwable instanceof ReceiverRecordProcessingException)
-                                    {
+                                    if (throwable instanceof ReceiverRecordProcessingException) {
                                         ReceiverRecordProcessingException exception = (ReceiverRecordProcessingException) throwable;
                                         exception.getReceiverRecord().receiverOffset().acknowledge();
                                     }
@@ -182,19 +181,18 @@ public class StepVerifierWithVirtualTime2Test {
                                 {
                                     rr.receiverOffset().acknowledge();
                                 })
-                                .onErrorMap(throwable ->
-                                {
-                                    return new ReceiverRecordProcessingException(throwable, rr);
-                                })
+                                        .onErrorMap(throwable ->
+                                        {
+                                            return new ReceiverRecordProcessingException(throwable, rr);
+                                        })
                         )
-                        .onErrorContinue((throwable, o) ->
-                        {
-                            if (throwable instanceof ReceiverRecordProcessingException)
-                            {
-                                ReceiverRecordProcessingException receiverRecordProcessingException = (ReceiverRecordProcessingException) throwable;
-                                receiverRecordProcessingException.getReceiverRecord().receiverOffset().acknowledge();
-                            }
-                        })
+                                .onErrorContinue((throwable, o) ->
+                                {
+                                    if (throwable instanceof ReceiverRecordProcessingException) {
+                                        ReceiverRecordProcessingException receiverRecordProcessingException = (ReceiverRecordProcessingException) throwable;
+                                        receiverRecordProcessingException.getReceiverRecord().receiverOffset().acknowledge();
+                                    }
+                                })
                                 .log()
                 )
                 .thenCancel()
@@ -202,6 +200,53 @@ public class StepVerifierWithVirtualTime2Test {
         verify(supplierWithFailerHandler, times(1)).getMono(receiverRecord1);
         verify(receiverOffset1, Mockito.never()).acknowledge();
     }
+
+    //TODO Rename tests case
+    @Test
+    public void shouldNotMapErrorWhenCheckedExceptionIsPropagatedAsReactiveExceptionXXXXX() {
+        // GIVEN
+        ConstantNumberSupplierWithFailerHandler supplierWithFailerHandler = mock(ConstantNumberSupplierWithFailerHandler.class);
+        ReceiverRecord<String, String> receiverRecord1 = mock(ReceiverRecord.class, "record1");
+        ReceiverOffset receiverOffset1 = mockReceiverOffset(receiverRecord1);
+        when(supplierWithFailerHandler.getMono(receiverRecord1)).thenThrow(Exceptions.propagate(new Exception("XXX1")));
+
+
+        // THEN
+        StepVerifier
+                .withVirtualTime(() -> Flux.just(receiverRecord1).flatMap(rr ->
+                                Mono.defer(() ->
+                                        {
+                                            try {
+                                                return supplierWithFailerHandler.getMono(rr);
+                                            } catch (Exception ex) {
+                                                throw Exceptions.propagate(ex);
+                                            }
+                                        }
+                                ).onErrorMap(throwable -> new ReceiverRecordProcessingException(throwable, rr))
+                        )
+                                .doOnError(throwable ->
+                                {
+                                    if (throwable instanceof ReceiverRecordProcessingException) {
+                                        ReceiverRecordProcessingException receiverRecordProcessingException = (ReceiverRecordProcessingException) throwable;
+                                        receiverRecordProcessingException.getReceiverRecord().receiverOffset().acknowledge();
+                                    }
+                                })
+                                .onErrorContinue((throwable, o) ->
+                                {
+                                    if (throwable instanceof ReceiverRecordProcessingException) {
+                                        ReceiverRecordProcessingException receiverRecordProcessingException = (ReceiverRecordProcessingException) throwable;
+                                        receiverRecordProcessingException.getReceiverRecord().receiverOffset().acknowledge();
+                                    }
+                                })
+                                .log()
+                )
+                .expectSubscription()
+                .thenCancel()
+                .verify(Duration.ofSeconds(1));
+        verify(supplierWithFailerHandler, times(1)).getMono(receiverRecord1);
+        verify(receiverOffset1, times(1)).acknowledge();
+    }
+
 
     private ReceiverOffset mockReceiverOffset(ReceiverRecord receiverRecord) {
         ReceiverOffset receiverOffset = mock(ReceiverOffset.class);
