@@ -1,6 +1,7 @@
 package com.github.starnowski.kafka.fun;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -162,6 +163,45 @@ public class StepVerifierWithVirtualTime2Test {
         verify(receiverOffset3, times(1)).acknowledge();
     }
 
+
+    @Test
+    public void shouldNotMapErrorWhenCheckedExceptionIsPropagatedAsReactiveException() {
+        // GIVEN
+        ConstantNumberSupplierWithFailerHandler supplierWithFailerHandler = mock(ConstantNumberSupplierWithFailerHandler.class);
+        ReceiverRecord<String, String> receiverRecord1 = mock(ReceiverRecord.class, "record1");
+        ReceiverOffset receiverOffset1 = mockReceiverOffset(receiverRecord1);
+        when(supplierWithFailerHandler.getMono(receiverRecord1)).thenThrow(Exceptions.propagate(new Exception("XXX1")));
+
+
+        // THEN
+        StepVerifier
+                .withVirtualTime(() -> Flux.just(receiverRecord1).flatMap(rr ->
+
+                                Mono.defer(() ->
+                                        supplierWithFailerHandler.getMono(rr)).doOnSuccess(integer ->
+                                {
+                                    rr.receiverOffset().acknowledge();
+                                })
+                                .onErrorMap(throwable ->
+                                {
+                                    return new ReceiverRecordProcessingException(throwable, rr);
+                                })
+                        )
+                        .onErrorContinue((throwable, o) ->
+                        {
+                            if (throwable instanceof ReceiverRecordProcessingException)
+                            {
+                                ReceiverRecordProcessingException receiverRecordProcessingException = (ReceiverRecordProcessingException) throwable;
+                                receiverRecordProcessingException.getReceiverRecord().receiverOffset().acknowledge();
+                            }
+                        })
+                                .log()
+                )
+                .thenCancel()
+                .verify(Duration.ofSeconds(1));
+        verify(supplierWithFailerHandler, times(1)).getMono(receiverRecord1);
+        verify(receiverOffset1, Mockito.never()).acknowledge();
+    }
 
     private ReceiverOffset mockReceiverOffset(ReceiverRecord receiverRecord) {
         ReceiverOffset receiverOffset = mock(ReceiverOffset.class);
