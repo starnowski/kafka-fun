@@ -17,7 +17,7 @@ import static org.mockito.Mockito.*;
 public class StepVerifierWithVirtualTime3Test {
 
     private static final int MAX_ATTEMPTS = 7;
-    private static final int MAX_DELAY_IN_SECONDS = 7;
+    private static final int MAX_DELAY_IN_SECONDS = 2;
 
     private static Flux<Integer> testedPipeline(Flux<ReceiverRecord<String, String>> source, ConstantNumberSupplierWithFailerHandler handler) {
         return source.flatMap(rr ->
