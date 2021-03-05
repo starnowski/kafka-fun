@@ -11,7 +11,7 @@ public class RecoverableErrorPredicate {
         if (depth < 0) {
             return false;
         }
-        if (Stream.of(throwables).anyMatch(t -> t.isAssignableFrom(throwable.getClass()))) {
+        if (throwables != null && Stream.of(throwables).anyMatch(t -> t.isAssignableFrom(throwable.getClass()))) {
             return true;
         }
         return test(throwable.getCause(), depth - 1, throwables);

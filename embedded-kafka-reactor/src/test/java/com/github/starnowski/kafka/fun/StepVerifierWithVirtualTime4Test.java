@@ -55,43 +55,43 @@ public class StepVerifierWithVirtualTime4Test {
         verify(receiverOffset2, times(1)).acknowledge();
     }
 
-//    @Test
-//    public void shouldProcessStreamWhenFirstFirstEventFailsWithNonRecoverableExceptionAndSecondEventFailsWithRecoverableAndStreamHasSpecifiedErrorFilter() {
-//        // GIVEN
-//        ConstantNumberSupplierWithFailerHandler handler = mock(ConstantNumberSupplierWithFailerHandler.class);
-//        ReceiverRecord<String, String> receiverRecord1 = mockWithMockedToString(ReceiverRecord.class, "record1");
-//        ReceiverRecord<String, String> receiverRecord2 = mockWithMockedToString(ReceiverRecord.class, "record2");
-//        ReceiverRecord<String, String> receiverRecord3 = mockWithMockedToString(ReceiverRecord.class, "record3");
-//        when(handler.getMono(receiverRecord1)).thenThrow(new SomeNonRecoverableException());
-//        when(handler.getMono(receiverRecord2)).thenThrow(new SomeRecoverableException());
-//        when(handler.getMono(receiverRecord3)).thenReturn(Mono.just(97));
-//        ReceiverOffset receiverOffset1 = mockReceiverOffset(receiverRecord1);
-//        ReceiverOffset receiverOffset2 = mockReceiverOffset(receiverRecord2);
-//        ReceiverOffset receiverOffset3 = mockReceiverOffset(receiverRecord3);
-//
-//        // WHEN
-//        Flux<Integer> stream = testedPipeline(Flux.just(receiverRecord1, receiverRecord2, receiverRecord3), handler);
-//
-//
-//        // THEN
-//        StepVerifier
-//                .withVirtualTime(() -> stream)
-//                .expectSubscription()
-//                .expectNoEvent(Duration.ofSeconds(2))
-//                .expectNoEvent(Duration.ofSeconds(2))
-//                .expectNext(97)
-//                .thenAwait(ofSeconds(360))// >= (2 * 2 ^ 1) + (2 * 2 ^ 2) + (2 * 2 ^ 3) + (2 * 2 ^ 4) + (2 * 2 ^ 5) + (2 * 2 ^ 6) + (2 * 2 ^ 7) [s]
-//                .thenCancel()
-//                .verify(Duration.ofSeconds(1));
-//        verify(handler, times(1)).getMono(receiverRecord1);
-//        verify(handler, times(8)).getMono(receiverRecord2);
-//        verify(handler, times(1)).getMono(receiverRecord3);
-//
-//        verify(receiverOffset1, times(1)).acknowledge();
-//        verify(receiverOffset2, times(1)).acknowledge();
-//        verify(receiverOffset3, times(1)).acknowledge();
-//    }
-//
+    @Test
+    public void shouldProcessStreamWhenFirstFirstEventFailsWithNonRecoverableExceptionAndSecondEventFailsWithRecoverableAndStreamHasSpecifiedErrorFilter() {
+        // GIVEN
+        GenericFunction<String, String> handler = mock(GenericFunction.class);
+        ReceiverRecord<String, String> receiverRecord1 = mockWithMockedToString(ReceiverRecord.class, "record1");
+        ReceiverRecord<String, String> receiverRecord2 = mockWithMockedToString(ReceiverRecord.class, "record2");
+        ReceiverRecord<String, String> receiverRecord3 = mockWithMockedToString(ReceiverRecord.class, "record3");
+        when(handler.getMono(receiverRecord1)).thenThrow(new SomeNonRecoverableException());
+        when(handler.getMono(receiverRecord2)).thenThrow(new SomeRecoverableException());
+        when(handler.getMono(receiverRecord3)).thenReturn(Mono.just("97"));
+        ReceiverOffset receiverOffset1 = mockReceiverOffset(receiverRecord1);
+        ReceiverOffset receiverOffset2 = mockReceiverOffset(receiverRecord2);
+        ReceiverOffset receiverOffset3 = mockReceiverOffset(receiverRecord3);
+
+        // WHEN
+        Flux<String> stream = tested.testedPipeline(Flux.just(receiverRecord1, receiverRecord2, receiverRecord3), handler, MAX_ATTEMPTS, MAX_DELAY_IN_SECONDS, SomeRecoverableException.class);
+
+
+        // THEN
+        StepVerifier
+                .withVirtualTime(() -> stream)
+                .expectSubscription()
+                .expectNoEvent(Duration.ofSeconds(MAX_DELAY_IN_SECONDS))
+                .expectNoEvent(Duration.ofSeconds(MAX_DELAY_IN_SECONDS))
+                .expectNext("97")
+                .thenAwait(ofSeconds(360))// >= (2 * 2 ^ 1) + (2 * 2 ^ 2) + (2 * 2 ^ 3) + (2 * 2 ^ 4) + (2 * 2 ^ 5) + (2 * 2 ^ 6) + (2 * 2 ^ 7) [s]
+                .thenCancel()
+                .verify(Duration.ofSeconds(1));
+        verify(handler, times(1)).getMono(receiverRecord1);
+        verify(handler, times(8)).getMono(receiverRecord2);
+        verify(handler, times(1)).getMono(receiverRecord3);
+
+        verify(receiverOffset1, times(1)).acknowledge();
+        verify(receiverOffset2, times(1)).acknowledge();
+        verify(receiverOffset3, times(1)).acknowledge();
+    }
+
 //    @Test
 //    public void shouldNMapErrorWhenCheckedExceptionIsPropagatedAsReactiveException() {
 //        // GIVEN
