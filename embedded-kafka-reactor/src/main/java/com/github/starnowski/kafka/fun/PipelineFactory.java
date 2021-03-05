@@ -10,7 +10,7 @@ import static java.time.Duration.ofSeconds;
 
 public class PipelineFactory {
 
-    public <K, V> Flux<V> testedPipeline(Flux<ReceiverRecord<K, V>> source, GenericFunction<K, V> handler, int maxAttempts, int delayInSeconds, Throwable... throwables) {
+    public <K, V, T extends Throwable> Flux<V> testedPipeline(Flux<ReceiverRecord<K, V>> source, GenericFunction<K, V> handler, int maxAttempts, int delayInSeconds, Class<T>... throwables) {
         return source.flatMap(rr ->
                 Mono.defer(() ->
                 {
