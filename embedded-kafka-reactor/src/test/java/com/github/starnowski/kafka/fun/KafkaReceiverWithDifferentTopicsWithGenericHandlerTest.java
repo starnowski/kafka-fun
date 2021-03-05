@@ -4,12 +4,14 @@ import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatcher;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.test.EmbeddedKafkaBroker;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.test.annotation.DirtiesContext;
+import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
 import reactor.kafka.receiver.KafkaReceiver;
 import reactor.kafka.receiver.ReceiverOptions;
@@ -21,6 +23,10 @@ import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest
 @DirtiesContext
@@ -70,7 +76,7 @@ public class KafkaReceiverWithDifferentTopicsWithGenericHandlerTest {
         Flux source = receiver.receive();
 
         // WHEN
-        Flux<String> stream = tested.testedPipeline(source, handler, MAX_ATTEMPTS, MAX_DELAY_IN_SECONDS, RuntimeException.class);
+        Flux<String> stream = tested.testedPipeline(source, handler, MAX_ATTEMPTS, MAX_DELAY_IN_SECONDS, RecoverableException.class);
 
         //THEN
         StepVerifier.create(stream).then(() -> {
@@ -104,7 +110,7 @@ public class KafkaReceiverWithDifferentTopicsWithGenericHandlerTest {
         String expectedKey = "KEYXXZ" + random.nextInt();
 
         // WHEN
-        Flux<String> stream = tested.testedPipeline(source.receive(), handler, MAX_ATTEMPTS, MAX_DELAY_IN_SECONDS, RuntimeException.class);
+        Flux<String> stream = tested.testedPipeline(source.receive(), handler, MAX_ATTEMPTS, MAX_DELAY_IN_SECONDS, RecoverableException.class);
 
         StepVerifier.create(stream)
                 .then(() -> {
@@ -129,6 +135,41 @@ public class KafkaReceiverWithDifferentTopicsWithGenericHandlerTest {
                 .verify(Duration.ofSeconds(15));
     }
 
+    @Test
+    public void testReactiveConsumerShouldFail() {
+        // GIVEN
+        GenericFunction<String, String> handler = mock(GenericFunction.class);
+        KafkaReceiver source = prepareKafkaReceiver("Test3", TOPIC_3, 2);
+        Random random = new Random();
+        String expectedValue = "YYY" + random.nextInt();
+        String expectedKey = "KEYXXZ" + random.nextInt();
+        when(handler.getMono(argThat(new ReceiverRecordMatcher<>(expectedKey, expectedValue)))).thenThrow(Exceptions.propagate(new Exception("INVALID")));
+
+        // WHEN
+        Flux<String> stream = tested.testedPipeline(source.receive(), handler, MAX_ATTEMPTS, MAX_DELAY_IN_SECONDS, RecoverableException.class);
+
+        StepVerifier.create(stream)
+                .then(() -> {
+                    try {
+                        logger.log(Level.INFO, "testReactiveConsumerShouldFail#kafkaTemplate.send : ");
+                        kafkaTemplate.send(TOPIC_3, 2, expectedKey, expectedValue).get();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    } catch (ExecutionException e) {
+                        e.printStackTrace();
+                    }
+                })
+                .thenAwait(Duration.ofSeconds(MAX_DELAY_IN_SECONDS))
+//                .expectNoEvent(Duration.ofSeconds(MAX_DELAY_IN_SECONDS))
+//                .expectError()
+                // the KafkaReceiver will never complete, we need to cancel explicitly
+                .thenCancel()
+                // always use a timeout, in case we don't receive anything
+                .verify(Duration.ofSeconds(15));
+
+        Mockito.verify(handler, Mockito.times(1)).getMono(argThat(new ReceiverRecordMatcher<>(expectedKey, expectedValue)));
+    }
+
     private static class ReceiverRecordMatcher<K, V> implements ArgumentMatcher<ReceiverRecord<K, V>> {
         private final K key;
         private final V value;
@@ -145,5 +186,10 @@ public class KafkaReceiverWithDifferentTopicsWithGenericHandlerTest {
             }
             return Objects.equals(key, rr.key()) && Objects.equals(value, rr.value());
         }
+    }
+
+    private static class RecoverableException extends Exception
+    {
+
     }
 }
