@@ -159,7 +159,8 @@ public class KafkaReceiverWithDifferentTopicsWithGenericHandlerTest {
                         e.printStackTrace();
                     }
                 })
-                .thenAwait(Duration.ofSeconds(MAX_DELAY_IN_SECONDS))
+//                .thenAwait(Duration.ofSeconds(MAX_DELAY_IN_SECONDS))
+                .expectNoEvent(Duration.ofSeconds(MAX_DELAY_IN_SECONDS))
 //                .expectNoEvent(Duration.ofSeconds(MAX_DELAY_IN_SECONDS))
 //                .expectError()
                 // the KafkaReceiver will never complete, we need to cancel explicitly
