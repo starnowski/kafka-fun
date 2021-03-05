@@ -3,6 +3,7 @@ package com.github.starnowski.kafka.fun;
 import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatcher;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -12,24 +13,23 @@ import org.springframework.test.annotation.DirtiesContext;
 import reactor.core.publisher.Flux;
 import reactor.kafka.receiver.KafkaReceiver;
 import reactor.kafka.receiver.ReceiverOptions;
+import reactor.kafka.receiver.ReceiverRecord;
 import reactor.test.StepVerifier;
 
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 @SpringBootTest
 @DirtiesContext
-@EmbeddedKafka(partitions = 2, topics = {KafkaReceiverWithDifferentTopicsWithGenericHandlerTest.TOPIC_1, KafkaReceiverWithDifferentTopicsWithGenericHandlerTest.TOPIC_2})
+@EmbeddedKafka(partitions = 3, topics = {KafkaReceiverWithDifferentTopicsWithGenericHandlerTest.TOPIC_1, KafkaReceiverWithDifferentTopicsWithGenericHandlerTest.TOPIC_2, KafkaReceiverWithDifferentTopicsWithGenericHandlerTest.TOPIC_3})
 public class KafkaReceiverWithDifferentTopicsWithGenericHandlerTest {
 
     public static final String TOPIC_1 = "first-embedded-test-topic";
-    public static final String TOPIC_2 = "first-embedded-test-topic";
+    public static final String TOPIC_2 = "second-embedded-test-topic";
+    public static final String TOPIC_3 = "third-embedded-test-topic";
 
     private static final Logger logger = Logger.getLogger(KafkaReceiverTest.class.getName());
 
@@ -127,5 +127,23 @@ public class KafkaReceiverWithDifferentTopicsWithGenericHandlerTest {
                 .thenCancel()
                 // always use a timeout, in case we don't receive anything
                 .verify(Duration.ofSeconds(15));
+    }
+
+    private static class ReceiverRecordMatcher<K, V> implements ArgumentMatcher<ReceiverRecord<K, V>> {
+        private final K key;
+        private final V value;
+
+        public ReceiverRecordMatcher(K key, V value) {
+            this.key = key;
+            this.value = value;
+        }
+
+        @Override
+        public boolean matches(ReceiverRecord<K, V> rr) {
+            if (rr == null) {
+                return false;
+            }
+            return Objects.equals(key, rr.key()) && Objects.equals(value, rr.value());
+        }
     }
 }
