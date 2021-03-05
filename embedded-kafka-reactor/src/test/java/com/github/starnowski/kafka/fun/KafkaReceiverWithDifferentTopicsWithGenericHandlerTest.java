@@ -94,36 +94,38 @@ public class KafkaReceiverWithDifferentTopicsWithGenericHandlerTest {
                 .verify(Duration.ofSeconds(15));
     }
 
-//    @Test
-//    public void testReactiveConsumer1() {
-//        // GIVEN
-//        KafkaReceiver receiver = prepareKafkaReceiver("Test2", TOPIC_2, 1);
-//        Random random = new Random();
-//        String expectedValue = "YYY" + random.nextInt();
-//        String expectedKey = "KEYXXZ" + random.nextInt();
-//
-//        StepVerifier.create(receiver.receive())
-//                .then(() -> {
-//                    try {
-//                        logger.log(Level.INFO, "testReactiveConsumer1#kafkaTemplate.send : ");
-//                        kafkaTemplate.send(TOPIC_2, 1, expectedKey, expectedValue).get();
-//                    } catch (InterruptedException e) {
-//                        e.printStackTrace();
-//                    } catch (ExecutionException e) {
-//                        e.printStackTrace();
-//                    }
-//                })
-//                .assertNext(r ->
-//                {
-//                    logger.log(Level.INFO, "testReactiveConsumer1#assertNext : " + r);
-//                    ConsumerRecord record = (ConsumerRecord) r;
-//                    Assertions.assertEquals(expectedKey, record.key());
-//                    Assertions.assertEquals(expectedValue, record.value());
-//
-//                })
-//                // the KafkaReceiver will never complete, we need to cancel explicitly
-//                .thenCancel()
-//                // always use a timeout, in case we don't receive anything
-//                .verify(Duration.ofSeconds(15));
-//    }
+    @Test
+    public void testReactiveConsumer1() {
+        // GIVEN
+        GenericFunction<String, String> handler = new GenericFunction<>();
+        KafkaReceiver source = prepareKafkaReceiver("Test2", TOPIC_2, 1);
+        Random random = new Random();
+        String expectedValue = "YYY" + random.nextInt();
+        String expectedKey = "KEYXXZ" + random.nextInt();
+
+        // WHEN
+        Flux<String> stream = tested.testedPipeline(source.receive(), handler, MAX_ATTEMPTS, MAX_DELAY_IN_SECONDS, RuntimeException.class);
+
+        StepVerifier.create(stream)
+                .then(() -> {
+                    try {
+                        logger.log(Level.INFO, "testReactiveConsumer1#kafkaTemplate.send : ");
+                        kafkaTemplate.send(TOPIC_2, 1, expectedKey, expectedValue).get();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    } catch (ExecutionException e) {
+                        e.printStackTrace();
+                    }
+                })
+                .assertNext(r ->
+                {
+                    logger.log(Level.INFO, "testReactiveConsumer1#assertNext : " + r);
+                    Assertions.assertEquals(expectedValue, r);
+
+                })
+                // the KafkaReceiver will never complete, we need to cancel explicitly
+                .thenCancel()
+                // always use a timeout, in case we don't receive anything
+                .verify(Duration.ofSeconds(15));
+    }
 }
