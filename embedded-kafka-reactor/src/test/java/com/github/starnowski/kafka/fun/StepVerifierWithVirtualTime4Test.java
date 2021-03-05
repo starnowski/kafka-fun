@@ -1,6 +1,7 @@
 package com.github.starnowski.kafka.fun;
 
 import org.junit.jupiter.api.Test;
+import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.kafka.receiver.ReceiverOffset;
@@ -92,28 +93,27 @@ public class StepVerifierWithVirtualTime4Test {
         verify(receiverOffset3, times(1)).acknowledge();
     }
 
-//    @Test
-//    public void shouldNMapErrorWhenCheckedExceptionIsPropagatedAsReactiveException() {
-//        // GIVEN
-//        ConstantNumberSupplierWithFailerHandler handler = mock(ConstantNumberSupplierWithFailerHandler.class);
-//        ReceiverRecord<String, String> receiverRecord1 = mock(ReceiverRecord.class, "record1");
-//        ReceiverOffset receiverOffset1 = mockReceiverOffset(receiverRecord1);
-//        when(handler.getMono(receiverRecord1)).thenThrow(Exceptions.propagate(new Exception("XXX1")));
-//
-//        // WHEN
-//        Flux<Integer> stream = testedPipeline(Flux.just(receiverRecord1), handler);
-//
-//        // THEN
-//        StepVerifier
-//                .withVirtualTime(() -> stream)
-//                .expectSubscription()
-//                .expectNoEvent(Duration.ofSeconds(2))
-//                .thenCancel()
-//                .verify(Duration.ofSeconds(15));
-//        verify(handler, times(1)).getMono(receiverRecord1);
-//        verify(receiverOffset1, times(1)).acknowledge();
-//    }
+    @Test
+    public void shouldNMapErrorWhenCheckedExceptionIsPropagatedAsReactiveException() {
+        // GIVEN
+        GenericFunction<String, String> handler = mock(GenericFunction.class);
+        ReceiverRecord<String, String> receiverRecord1 = mock(ReceiverRecord.class, "record1");
+        ReceiverOffset receiverOffset1 = mockReceiverOffset(receiverRecord1);
+        when(handler.getMono(receiverRecord1)).thenThrow(Exceptions.propagate(new Exception("XXX1")));
 
+        // WHEN
+        Flux<String> stream = tested.testedPipeline(Flux.just(receiverRecord1), handler, MAX_ATTEMPTS, MAX_DELAY_IN_SECONDS, SomeRecoverableException.class);
+
+        // THEN
+        StepVerifier
+                .withVirtualTime(() -> stream)
+                .expectSubscription()
+                .expectNoEvent(Duration.ofSeconds(2))
+                .thenCancel()
+                .verify(Duration.ofSeconds(15));
+        verify(handler, times(1)).getMono(receiverRecord1);
+        verify(receiverOffset1, times(1)).acknowledge();
+    }
 
     private ReceiverOffset mockReceiverOffset(ReceiverRecord receiverRecord) {
         ReceiverOffset receiverOffset = mock(ReceiverOffset.class);
