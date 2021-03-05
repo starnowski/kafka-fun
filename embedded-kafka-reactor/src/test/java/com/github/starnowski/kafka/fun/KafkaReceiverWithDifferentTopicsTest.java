@@ -1,6 +1,7 @@
 package com.github.starnowski.kafka.fun;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.springframework.kafka.test.utils.KafkaTestUtils.getCurrentOffset;
+
 @SpringBootTest
 @DirtiesContext
 @EmbeddedKafka(partitions = 2, topics = {KafkaReceiverWithDifferentTopicsTest.TOPIC_1, KafkaReceiverWithDifferentTopicsTest.TOPIC_2})
@@ -31,6 +35,7 @@ public class KafkaReceiverWithDifferentTopicsTest {
 
     public static final String TOPIC_1 = "first-embedded-test-topic";
     public static final String TOPIC_2 = "first-embedded-test-topic";
+    public static final String GROUP = "baeldung";
 
     private static final Logger logger = Logger.getLogger(KafkaReceiverTest.class.getName());
 
@@ -42,7 +47,7 @@ public class KafkaReceiverWithDifferentTopicsTest {
 
     private KafkaReceiver prepareKafkaReceiver(String clientId, String topic, int partition) {
         Map<String, Object> optionsMap = new HashMap<>();
-        optionsMap.put("group.id", "baeldung");
+        optionsMap.put("group.id", GROUP);
         optionsMap.put("client.id", clientId);
         optionsMap.put("auto.offset.reset", "earliest");
         optionsMap.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
@@ -56,13 +61,15 @@ public class KafkaReceiverWithDifferentTopicsTest {
     }
 
     @Test
-    public void testReactiveConsumer() {
+    public void testReactiveConsumer() throws Exception {
         // GIVEN
         KafkaReceiver receiver = prepareKafkaReceiver("Test1", TOPIC_1, 0);
         Random random = new Random();
         String expectedValue = "SSS" + random.nextInt();
         String expectedKey = "KEY11" + random.nextInt();
         Flux stream = receiver.receive();
+        OffsetAndMetadata offset = offsetAndMetadataForTopicAndPartition(TOPIC_1, 0);
+        assertNull(offset);
 
         //WHEN
         StepVerifier.FirstStep steps = StepVerifier.create(stream);
@@ -89,15 +96,20 @@ public class KafkaReceiverWithDifferentTopicsTest {
                 .thenCancel()
                 // always use a timeout, in case we don't receive anything
                 .verify(Duration.ofSeconds(15));
+
+        offset = offsetAndMetadataForTopicAndPartition(TOPIC_1, 0);
+        assertNull(offset);
     }
 
     @Test
-    public void testReactiveConsumer1() {
+    public void testReactiveConsumer1() throws Exception {
         // GIVEN
         KafkaReceiver receiver = prepareKafkaReceiver("Test2", TOPIC_2, 1);
         Random random = new Random();
         String expectedValue = "YYY" + random.nextInt();
         String expectedKey = "KEYXXZ" + random.nextInt();
+        OffsetAndMetadata offset = offsetAndMetadataForTopicAndPartition(TOPIC_2, 1);
+        assertNull(offset);
 
         StepVerifier.create(receiver.receive())
                 .then(() -> {
@@ -122,5 +134,11 @@ public class KafkaReceiverWithDifferentTopicsTest {
                 .thenCancel()
                 // always use a timeout, in case we don't receive anything
                 .verify(Duration.ofSeconds(15));
+        offset = offsetAndMetadataForTopicAndPartition(TOPIC_2, 1);
+        assertNull(offset);
+    }
+
+    private OffsetAndMetadata offsetAndMetadataForTopicAndPartition(String topic, int topicIndex) throws Exception {
+        return getCurrentOffset(embeddedKafkaBroker.getBrokersAsString(), GROUP, topic, topicIndex);
     }
 }
