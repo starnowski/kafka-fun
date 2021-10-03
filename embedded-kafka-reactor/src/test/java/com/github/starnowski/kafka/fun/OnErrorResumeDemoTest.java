@@ -46,4 +46,27 @@ public class OnErrorResumeDemoTest {
                 .expectNext(2)
                 .verifyComplete();
     }
+
+    @Test
+    public void thirdTestCase() {
+        // GIVEN
+        Flux<Integer> stream = Flux.range(1, 5)
+                .doOnNext(i -> System.out.println("input=" + i))
+                .map(i -> i == 3 ? i / 0 : i)
+                .map(i -> i)
+                .onErrorContinue((err, i) -> {
+                    System.out.println("onErrorContinue");
+                });
+
+        // WHEN
+        StepVerifier.FirstStep<Integer> stepVerifier = StepVerifier.create(stream);
+
+        // THEN
+        stepVerifier
+                .expectNext(1)
+                .expectNext(2)
+                .expectNext(4)
+                .expectNext(5)
+                .verifyComplete();
+    }
 }
