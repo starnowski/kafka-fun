@@ -11,3 +11,10 @@ https://projectreactor.io/docs/kafka/release/reference/
 
 ## Kafka testing with Spring Boot
 https://www.baeldung.com/spring-boot-kafka-testing
+
+## Reactor-kafka-reciver bath polling issues
+https://github.com/reactor/reactor-kafka/issues/183
+https://github.com/reactor/reactor-kafka/issues/108
+
+## Threads and Schedulers
+https://spring.io/blog/2019/12/13/flight-of-the-flux-3-hopping-threads-and-schedulers

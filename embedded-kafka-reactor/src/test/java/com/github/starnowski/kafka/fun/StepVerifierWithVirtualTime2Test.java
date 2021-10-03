@@ -1,6 +1,7 @@
 package com.github.starnowski.kafka.fun;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -132,8 +133,7 @@ public class StepVerifierWithVirtualTime2Test {
                                     return true;
                                 },
                                 (throwable, o) -> {
-                                    if (throwable instanceof ReceiverRecordProcessingException)
-                                    {
+                                    if (throwable instanceof ReceiverRecordProcessingException) {
                                         ReceiverRecordProcessingException exception = (ReceiverRecordProcessingException) throwable;
                                         exception.getReceiverRecord().receiverOffset().acknowledge();
                                     }
@@ -160,6 +160,90 @@ public class StepVerifierWithVirtualTime2Test {
         verify(receiverOffset1, times(1)).acknowledge();
         verify(receiverOffset2, times(1)).acknowledge();
         verify(receiverOffset3, times(1)).acknowledge();
+    }
+
+
+    @Test
+    public void shouldNotMapErrorWhenCheckedExceptionIsPropagatedAsReactiveException() {
+        // GIVEN
+        ConstantNumberSupplierWithFailerHandler supplierWithFailerHandler = mock(ConstantNumberSupplierWithFailerHandler.class);
+        ReceiverRecord<String, String> receiverRecord1 = mock(ReceiverRecord.class, "record1");
+        ReceiverOffset receiverOffset1 = mockReceiverOffset(receiverRecord1);
+        when(supplierWithFailerHandler.getMono(receiverRecord1)).thenThrow(Exceptions.propagate(new Exception("XXX1")));
+
+
+        // THEN
+        StepVerifier
+                .withVirtualTime(() -> Flux.just(receiverRecord1).flatMap(rr ->
+
+                                Mono.defer(() ->
+                                        supplierWithFailerHandler.getMono(rr)).doOnSuccess(integer ->
+                                {
+                                    rr.receiverOffset().acknowledge();
+                                })
+                                        .onErrorMap(throwable ->
+                                        {
+                                            return new ReceiverRecordProcessingException(throwable, rr);
+                                        })
+                        )
+                                .onErrorContinue((throwable, o) ->
+                                {
+                                    if (throwable instanceof ReceiverRecordProcessingException) {
+                                        ReceiverRecordProcessingException receiverRecordProcessingException = (ReceiverRecordProcessingException) throwable;
+                                        receiverRecordProcessingException.getReceiverRecord().receiverOffset().acknowledge();
+                                    }
+                                })
+                                .log()
+                )
+                .thenCancel()
+                .verify(Duration.ofSeconds(1));
+        verify(supplierWithFailerHandler, times(1)).getMono(receiverRecord1);
+        verify(receiverOffset1, Mockito.never()).acknowledge();
+    }
+
+    @Test
+    public void shouldNMapErrorWhenCheckedExceptionIsPropagatedAsReactiveException() {
+        // GIVEN
+        ConstantNumberSupplierWithFailerHandler supplierWithFailerHandler = mock(ConstantNumberSupplierWithFailerHandler.class);
+        ReceiverRecord<String, String> receiverRecord1 = mock(ReceiverRecord.class, "record1");
+        ReceiverOffset receiverOffset1 = mockReceiverOffset(receiverRecord1);
+        when(supplierWithFailerHandler.getMono(receiverRecord1)).thenThrow(Exceptions.propagate(new Exception("XXX1")));
+
+
+        // THEN
+        StepVerifier
+                .withVirtualTime(() -> Flux.just(receiverRecord1).flatMap(rr ->
+                                Mono.defer(() ->
+                                        {
+                                            try {
+                                                return supplierWithFailerHandler.getMono(rr);
+                                            } catch (Exception ex) {
+                                                throw Exceptions.propagate(ex);
+                                            }
+                                        }
+                                ).onErrorMap(throwable -> new ReceiverRecordProcessingException(throwable, rr))
+                        )
+                                .doOnError(throwable ->
+                                {
+                                    if (throwable instanceof ReceiverRecordProcessingException) {
+                                        ReceiverRecordProcessingException receiverRecordProcessingException = (ReceiverRecordProcessingException) throwable;
+                                        receiverRecordProcessingException.getReceiverRecord().receiverOffset().acknowledge();
+                                    }
+                                })
+                                .onErrorContinue((throwable, o) ->
+                                {
+                                    if (throwable instanceof ReceiverRecordProcessingException) {
+                                        ReceiverRecordProcessingException receiverRecordProcessingException = (ReceiverRecordProcessingException) throwable;
+                                        receiverRecordProcessingException.getReceiverRecord().receiverOffset().acknowledge();
+                                    }
+                                })
+                                .log()
+                )
+                .expectSubscription()
+                .thenCancel()
+                .verify(Duration.ofSeconds(1));
+        verify(supplierWithFailerHandler, times(1)).getMono(receiverRecord1);
+        verify(receiverOffset1, times(1)).acknowledge();
     }
 
 
